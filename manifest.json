@@ -1,0 +1,9 @@
+﻿{
+    "name":  "Cobblemon Legacy",
+    "version":  "1.0.0",
+    "minecraftVersion":  "1.21.1",
+    "fabricLoaderVersion":  "latest",
+    "files":  [
+
+              ]
+}

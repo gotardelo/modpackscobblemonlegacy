@@ -1,0 +1,10 @@
+{
+  "terminal.integrated.env.windows": {
+    "PATH": "${env:PATH};C:\\Program Files\\dotnet",
+    "Path": "${env:Path};C:\\Program Files\\dotnet"
+  },
+  "code-runner.runInTerminal": true,
+  "code-runner.executorMap": {
+    "csharp": "cd /d \"$dir\" && \"C:\\Program Files\\dotnet\\dotnet.exe\" run --project \"$workspaceRoot\\CobblemonLegacy.csproj\""
+  }
+}

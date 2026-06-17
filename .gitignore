@@ -1,0 +1,14 @@
+bin/
+obj/
+publish/
+dist/
+
+*.user
+*.suo
+*.rsuser
+*.download
+
+.vs/
+.idea/
+
+*.log
