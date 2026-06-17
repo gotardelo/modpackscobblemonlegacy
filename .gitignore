@@ -17,6 +17,7 @@ pack/mods/*
 pack/resourcepacks/*
 pack/config/*
 pack/shaderpacks/*
+pack/excluded-mods/*
 !pack/mods/.gitkeep
 !pack/resourcepacks/.gitkeep
 !pack/config/.gitkeep
