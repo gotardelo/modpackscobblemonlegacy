@@ -12,3 +12,12 @@ dist/
 .idea/
 
 *.log
+
+pack/mods/*
+pack/resourcepacks/*
+pack/config/*
+pack/shaderpacks/*
+!pack/mods/.gitkeep
+!pack/resourcepacks/.gitkeep
+!pack/config/.gitkeep
+!pack/shaderpacks/.gitkeep

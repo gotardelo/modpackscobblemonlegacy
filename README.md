@@ -38,7 +38,7 @@ Depois gere o manifest com hashes:
 .\tools\New-ModpackManifest.ps1 -Version "1.0.0" -ReleaseBaseUrl "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0"
 ```
 
-Suba os arquivos do `pack` para uma GitHub Release e suba o `manifest.json` no branch `main`.
+Suba os arquivos dentro de `pack/mods`, `pack/resourcepacks`, `pack/config` e `pack/shaderpacks` como assets da GitHub Release. O manifest guarda o destino local completo, mas a URL da release usa o nome do arquivo.
 
 ## Publicar o launcher
 

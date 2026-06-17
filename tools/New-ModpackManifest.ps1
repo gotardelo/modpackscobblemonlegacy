@@ -15,6 +15,7 @@ if (-not (Test-Path -LiteralPath $PackRoot)) {
 }
 
 $root = (Resolve-Path -LiteralPath $PackRoot).Path
+$rootWithSeparator = $root.TrimEnd("\", "/") + [IO.Path]::DirectorySeparatorChar
 $files = @()
 $allowedRoots = @("mods", "resourcepacks", "config", "shaderpacks")
 
@@ -27,13 +28,13 @@ foreach ($folder in $allowedRoots) {
     Get-ChildItem -LiteralPath $folderPath -File -Recurse | Where-Object {
         $_.Name -notin @(".gitkeep", ".DS_Store", "Thumbs.db")
     } | ForEach-Object {
-        $relative = [IO.Path]::GetRelativePath($root, $_.FullName).Replace("\", "/")
+        $relative = $_.FullName.Substring($rootWithSeparator.Length).Replace("\", "/")
         $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
-        $escapedPath = ($relative -split "/" | ForEach-Object { [uri]::EscapeDataString($_) }) -join "/"
+        $assetName = [uri]::EscapeDataString($_.Name)
 
         $files += [ordered]@{
             path = $relative
-            url = "$ReleaseBaseUrl/$escapedPath"
+            url = "$ReleaseBaseUrl/$assetName"
             sha256 = $hash.Hash.ToLowerInvariant()
             size = $_.Length
             required = $true
