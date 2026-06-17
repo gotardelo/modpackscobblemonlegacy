@@ -30,7 +30,9 @@ foreach ($folder in $allowedRoots) {
     } | ForEach-Object {
         $relative = $_.FullName.Substring($rootWithSeparator.Length).Replace("\", "/")
         $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
-        $assetName = [uri]::EscapeDataString($_.Name)
+        $assetName = [regex]::Replace($_.Name, "[^A-Za-z0-9._-]+", ".")
+        $assetName = [regex]::Replace($assetName, "\.+", ".").Trim(".")
+        $assetName = [uri]::EscapeDataString($assetName)
 
         $files += [ordered]@{
             path = $relative

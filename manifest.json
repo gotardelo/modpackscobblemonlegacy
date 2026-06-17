@@ -6,14 +6,14 @@
     "files":  [
                   {
                       "path":  "resourcepacks/-1.21.2 Fresh Moves v3.1 (With Animated Eyes) (2).zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/-1.21.2%20Fresh%20Moves%20v3.1%20(With%20Animated%20Eyes)%20(2).zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/-1.21.2.Fresh.Moves.v3.1.With.Animated.Eyes.2.zip",
                       "sha256":  "c433f3d831e86faa956836bf327ca00151bd813d1a8ab36aa064d518a58790f7",
                       "size":  321871,
                       "required":  true
                   },
                   {
                       "path":  "resourcepacks/AllTheMons [R3.1].zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/AllTheMons%20%5BR3.1%5D.zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/AllTheMons.R3.1.zip",
                       "sha256":  "f1a96d691eec22a534e1dde0cbd2ece27bc514d7ddb8c380baad661015310657",
                       "size":  10821188,
                       "required":  true
@@ -27,7 +27,7 @@
                   },
                   {
                       "path":  "resourcepacks/ATM x MSD [3.2.1].zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/ATM%20x%20MSD%20%5B3.2.1%5D.zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/ATM.x.MSD.3.2.1.zip",
                       "sha256":  "4a6698f785bd6a5925f5c5ec1d20dab6d2b6a3ecba1500636380e78f17023c9d",
                       "size":  7999349,
                       "required":  true
@@ -48,21 +48,21 @@
                   },
                   {
                       "path":  "resourcepacks/Cobblemon Classic Grass Pack v2.1 MC1.21.1 (2).zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Cobblemon%20Classic%20Grass%20Pack%20v2.1%20MC1.21.1%20(2).zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Cobblemon.Classic.Grass.Pack.v2.1.MC1.21.1.2.zip",
                       "sha256":  "4386b800db3f7710c23f5ead9c911c9f265831a02e74c704f7cc29fcd9070880",
                       "size":  7418,
                       "required":  true
                   },
                   {
                       "path":  "resourcepacks/Cobblemon Icons V2.4.zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Cobblemon%20Icons%20V2.4.zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Cobblemon.Icons.V2.4.zip",
                       "sha256":  "6ddff2d131b34a7582c13ae572a830286754850121b00fe18c0ee2b3a861ef0b",
                       "size":  44010,
                       "required":  true
                   },
                   {
                       "path":  "resourcepacks/Cobblemon Legends Z-A.zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Cobblemon%20Legends%20Z-A.zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Cobblemon.Legends.Z-A.zip",
                       "sha256":  "87cfdd9ddb6561a4ac6219039c66df5d4c6dd5c335396d95080f8f4011962abf",
                       "size":  46595072,
                       "required":  true
@@ -104,56 +104,56 @@
                   },
                   {
                       "path":  "resourcepacks/E19 Cobblemon Minimap Icons (1).zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/E19%20Cobblemon%20Minimap%20Icons%20(1).zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/E19.Cobblemon.Minimap.Icons.1.zip",
                       "sha256":  "8732ecb1ee0b8cceda4ad973ffcf53e0c6689f503652320107d2569c0cd7f9ba",
                       "size":  19398814,
                       "required":  true
                   },
                   {
                       "path":  "resourcepacks/Extra Paradox Mons 1.7.zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Extra%20Paradox%20Mons%201.7.zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Extra.Paradox.Mons.1.7.zip",
                       "sha256":  "f744ceb3692ba0710f27afc2219f42029ca01697851112fc62d60a3df90dd847",
                       "size":  1766107,
                       "required":  true
                   },
                   {
                       "path":  "resourcepacks/FreshAnimations_v1.10.3 (1).zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/FreshAnimations_v1.10.3%20(1).zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/FreshAnimations_v1.10.3.1.zip",
                       "sha256":  "999fbdfe9cddcbadeaaa02827f0583dc3d38d8f264146301cb88395d18df85a9",
                       "size":  855766,
                       "required":  true
                   },
                   {
                       "path":  "resourcepacks/Genomons 1.6 [Beta V3].zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Genomons%201.6%20%5BBeta%20V3%5D.zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Genomons.1.6.Beta.V3.zip",
                       "sha256":  "671b5dafb4598c7949a6c448babf07ea04b6ba17b5493ef4d5318c7eeab2cf17",
                       "size":  2346624,
                       "required":  true
                   },
                   {
                       "path":  "resourcepacks/Kale\u0027s Collection [v1.8.2].zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Kale\u0027s%20Collection%20%5Bv1.8.2%5D.zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Kale.s.Collection.v1.8.2.zip",
                       "sha256":  "2aa6d9e0212e566f49bd2b25c090675c2b15e8265c5cf0346be72e1d67d86be0",
                       "size":  993524,
                       "required":  true
                   },
                   {
                       "path":  "resourcepacks/Lost Lore [v1.8].zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Lost%20Lore%20%5Bv1.8%5D.zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Lost.Lore.v1.8.zip",
                       "sha256":  "a5c4a436838d59183fa67e74ad3e0b47549ba3cdd50f8dbcf529672faaa149a1",
                       "size":  1341492,
                       "required":  true
                   },
                   {
                       "path":  "resourcepacks/Lucario_Overhaul_v1.2.2 (1).zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Lucario_Overhaul_v1.2.2%20(1).zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Lucario_Overhaul_v1.2.2.1.zip",
                       "sha256":  "853643feadaa3666d4278b9e636568c502d122b01c071c9a4b21fc2a69ce14cd",
                       "size":  572679,
                       "required":  true
                   },
                   {
                       "path":  "resourcepacks/Mega Stone Resprites.zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Mega%20Stone%20Resprites.zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/Mega.Stone.Resprites.zip",
                       "sha256":  "c628109d5c05c3299873a8b23d1ac50e1785c7d0425b07a794c62c49084cb0c2",
                       "size":  216705,
                       "required":  true
@@ -181,7 +181,7 @@
                   },
                   {
                       "path":  "resourcepacks/PokeCostume v.3.2 (1).zip",
-                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/PokeCostume%20v.3.2%20(1).zip",
+                      "url":  "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/PokeCostume.v.3.2.1.zip",
                       "sha256":  "91d37a66238af454c091cec420e592ef291e28cd8642dddf69303faf253bcc17",
                       "size":  190881,
                       "required":  true
