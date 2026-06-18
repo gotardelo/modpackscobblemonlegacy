@@ -2,6 +2,7 @@ using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -20,6 +21,7 @@ public partial class MainWindow : Window
         "launcher-ui.log");
 
     private readonly HttpClient http;
+    private readonly CancellationTokenSource serverStatusCancellation = new();
     private LauncherSettings? settings;
     private ModpackManifest? manifest;
     private bool isBusy;
@@ -31,7 +33,12 @@ public partial class MainWindow : Window
         InitializeComponent();
         Loaded += MainWindow_Loaded;
         Closing += (_, _) => isClosing = true;
-        Closed += (_, _) => http.Dispose();
+        Closed += (_, _) =>
+        {
+            serverStatusCancellation.Cancel();
+            serverStatusCancellation.Dispose();
+            http.Dispose();
+        };
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -45,6 +52,7 @@ public partial class MainWindow : Window
             await EnsureAuthChoiceAsync();
             ApplySettingsToUi();
             await LoadManifestAsync();
+            _ = RefreshServerStatusLoopAsync(serverStatusCancellation.Token);
 
             SetStatus("Pronto para jogar.");
             SetBusy(false);
@@ -324,6 +332,32 @@ public partial class MainWindow : Window
     {
         Clipboard.SetText(LauncherRuntime.ServerIp);
         SetStatus("IP copiado.");
+    }
+
+    private async Task RefreshServerStatusLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await RefreshServerStatusAsync(cancellationToken);
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+                await RefreshServerStatusAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task RefreshServerStatusAsync(CancellationToken cancellationToken)
+    {
+        var status = await MinecraftServerStatusClient.QueryAsync(LauncherRuntime.ServerIp, cancellationToken);
+
+        Dispatcher.Invoke(() =>
+        {
+            ServerPlayersText.Text = status.ToDisplayText();
+            ServerPlayersText.ToolTip = status.ToToolTipText();
+        });
     }
 
     private void WindowChrome_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
