@@ -8,15 +8,17 @@ AppId={{E91507EB-0D8C-42C8-9227-3DE36D2CF2E3}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\Cobblemon Legacy Launcher
+DefaultDirName={localappdata}\Programs\Cobblemon Legacy Launcher
 DefaultGroupName=Cobblemon Legacy
 OutputDir=..\dist
 OutputBaseFilename=CobblemonLegacyLauncherSetup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+SetupIconFile=..\Assets\launcher-icon.ico
+UninstallDisplayIcon={app}\{#MyAppExeName}
+PrivilegesRequired=lowest
+ArchitecturesAllowed=x64compatible
 
 [Languages]
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
