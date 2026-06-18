@@ -236,6 +236,7 @@
                                     Margin="0,20,0,0"
                                     FontSize="19"
                                     FontWeight="Black"
+                                    Visibility="Collapsed"
                                     Click="PlayButton_Click" />
 
                             <Button Content="Atualizar pack"

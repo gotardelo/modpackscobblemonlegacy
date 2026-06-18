@@ -105,6 +105,7 @@ public partial class MainWindow : Window
 
         NicknameTextBox.Text = settings.OfflineUsername;
         ShowNicknameEditor(false);
+        ShowPlayButton(false);
         RamText.Text = $"RAM: {settings.MaximumRamMb} MB";
         UpdateAccountText();
     }
@@ -265,6 +266,7 @@ public partial class MainWindow : Window
             settings.AuthMode = AuthModes.Offline;
             await SaveOfflineNicknameIfNeededAsync();
             ShowNicknameEditor(false);
+            ShowPlayButton(true);
             SetStatus("Nickname salvo.");
         }
         catch (Exception ex)
@@ -283,6 +285,7 @@ public partial class MainWindow : Window
             settings.AuthMode = AuthModes.Microsoft;
             await settings.SaveAsync(LauncherRuntime.JsonOptions);
             ShowNicknameEditor(false);
+            ShowPlayButton(true);
             UpdateAccountText();
             SetStatus("Microsoft selecionado. O login abre quando voce clicar em Jogar.");
         }
@@ -303,7 +306,8 @@ public partial class MainWindow : Window
             await settings.SaveAsync(LauncherRuntime.JsonOptions);
             UpdateAccountText();
             ShowNicknameEditor(true);
-            SetStatus("Digite seu nickname e clique em Salvar ou Jogar.");
+            ShowPlayButton(false);
+            SetStatus("Digite seu nickname e clique em Salvar.");
         }
         catch (Exception ex)
         {
@@ -345,6 +349,11 @@ public partial class MainWindow : Window
             NicknameTextBox.Focus();
             NicknameTextBox.SelectAll();
         }
+    }
+
+    private void ShowPlayButton(bool visible)
+    {
+        PlayButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static bool IsFromInteractiveControl(DependencyObject? source)
