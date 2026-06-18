@@ -40,14 +40,72 @@
             <Setter Property="BorderBrush" Value="#7F7FA6BD" />
         </Style>
 
-        <Style x:Key="FooterLinkButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="Height" Value="30" />
-            <Setter Property="MinWidth" Value="96" />
-            <Setter Property="Padding" Value="12,4" />
+        <Style x:Key="FooterLinkButton" TargetType="Button">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="MinWidth" Value="104" />
+            <Setter Property="Padding" Value="12,0" />
             <Setter Property="FontSize" Value="12" />
-            <Setter Property="Foreground" Value="#EAF6FF" />
-            <Setter Property="Background" Value="#50101C2A" />
-            <Setter Property="BorderBrush" Value="#577AA8C4" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#061019" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid x:Name="ButtonRoot">
+                            <Border x:Name="ButtonBase"
+                                    Margin="0,4,0,0"
+                                    CornerRadius="5"
+                                    Background="#045889"
+                                    Opacity="0.95" />
+                            <Border x:Name="ButtonFace"
+                                    Margin="0,0,0,4"
+                                    CornerRadius="5"
+                                    BorderBrush="#BDEEFF"
+                                    BorderThickness="1">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#9DF1FF" Offset="0" />
+                                        <GradientStop Color="#22B5FF" Offset="0.52" />
+                                        <GradientStop Color="#087DCA" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <Grid ClipToBounds="True">
+                                    <Border Height="1"
+                                            VerticalAlignment="Top"
+                                            Margin="6,1,6,0"
+                                            Background="#E8FFFFFF"
+                                            Opacity="0.75" />
+                                    <ContentPresenter HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Margin="{TemplateBinding Padding}" />
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonFace" Property="BorderBrush" Value="#FFFFFF" />
+                                <Setter TargetName="ButtonBase" Property="Background" Value="#0475B8" />
+                                <Setter Property="Foreground" Value="#02070B" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonFace" Property="Margin" Value="0,3,0,1" />
+                                <Setter TargetName="ButtonBase" Property="Margin" Value="0,4,0,0" />
+                                <Setter TargetName="ButtonBase" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.48" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FooterUtilityButton" TargetType="Button" BasedOn="{StaticResource FooterLinkButton}">
+            <Setter Property="Height" Value="29" />
+            <Setter Property="MinWidth" Value="88" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="FontSize" Value="12" />
         </Style>
 
         <Style x:Key="LauncherProgressBar" TargetType="ProgressBar">
@@ -322,90 +380,183 @@
                     </Border>
                 </Grid>
 
-                <Grid Grid.Row="2" Margin="22,11,22,12">
+                <Grid Grid.Row="2" Margin="18,7,18,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="356" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="SERVIDOR"
-                                       Foreground="{StaticResource CyanBrush}"
-                                       FontSize="11"
-                                       FontWeight="Bold" />
-                            <TextBlock x:Name="ManifestText"
-                                       Foreground="#AABDD0"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Margin="16,0,0,0" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                            <TextBlock Text="enx-cirion-16.enx.host:10068"
-                                       Foreground="#FFFFFF"
-                                       FontSize="16"
-                                       FontWeight="Bold" />
-                            <Button Content="Copiar IP"
-                                    Style="{StaticResource SecondaryButton}"
-                                    MinWidth="86"
-                                    Height="28"
-                                    Padding="10,2"
-                                    Margin="12,0,0,0"
-                                    Click="CopyIpButton_Click" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <TextBlock Text="Hospedado na Enxada Host"
-                                       Foreground="#94A9B9"
-                                       FontSize="12" />
-                            <TextBlock x:Name="ServerPlayersText"
-                                       Text="Online: consultando..."
-                                       Foreground="{StaticResource CyanBrush}"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       TextTrimming="CharacterEllipsis"
-                                       MaxWidth="360"
-                                       Margin="14,0,0,0" />
-                        </StackPanel>
-                    </StackPanel>
+                    <Border CornerRadius="7"
+                            BorderBrush="#4A77A7C4"
+                            BorderThickness="1"
+                            Padding="12,7">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#BA07111A" Offset="0" />
+                                <GradientStop Color="#D1081724" Offset="0.58" />
+                                <GradientStop Color="#BA041018" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000"
+                                              BlurRadius="18"
+                                              ShadowDepth="4"
+                                              Opacity="0.55" />
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="17" />
+                                <RowDefinition Height="29" />
+                                <RowDefinition Height="15" />
+                            </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Column="1"
-                                Width="330"
-                                VerticalAlignment="Center">
-                        <TextBlock x:Name="PackSummaryText"
-                                   Text="Manifest pendente"
-                                   Foreground="#FFFFFF"
-                                   FontSize="13"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Right" />
-                        <TextBlock x:Name="RamText"
-                                   Foreground="#94A9B9"
-                                   FontSize="12"
-                                   HorizontalAlignment="Right"
-                                   Margin="0,4,0,0" />
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Right"
-                                    Margin="0,8,0,0">
-                            <Button Content="Discord"
-                                    Style="{StaticResource FooterLinkButton}"
-                                    Click="DiscordButton_Click" />
-                            <Button Content="Site"
-                                    Style="{StaticResource FooterLinkButton}"
-                                    Margin="10,0,0,0"
-                                    Click="WebsiteButton_Click" />
-                        </StackPanel>
+                            <Border Height="1"
+                                    VerticalAlignment="Top"
+                                    Background="#68BDEBFF"
+                                    Opacity="0.65" />
+
+                            <Grid Grid.Row="0">
+                                <TextBlock Text="SERVIDOR"
+                                           Foreground="{StaticResource CyanBrush}"
+                                           FontSize="11"
+                                           FontWeight="Black"
+                                           VerticalAlignment="Center" />
+                                <Border HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Padding="8,1"
+                                        CornerRadius="5"
+                                        Background="#3624E6FF"
+                                        BorderBrush="#6A4BE7FF"
+                                        BorderThickness="1">
+                                    <TextBlock x:Name="ServerPlayersText"
+                                               Text="Online: consultando..."
+                                               Foreground="#72E7FF"
+                                               FontSize="11"
+                                               FontWeight="Bold"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxWidth="250" />
+                                </Border>
+                            </Grid>
+
+                            <Grid Grid.Row="1" Margin="0,1,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="9" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="enx-cirion-16.enx.host:10068"
+                                           Foreground="#FFFFFF"
+                                           FontSize="16"
+                                           FontWeight="Black"
+                                           VerticalAlignment="Center"
+                                           Effect="{StaticResource TitleShadow}" />
+                                <Button Grid.Column="2"
+                                        Content="Copiar IP"
+                                        Style="{StaticResource FooterUtilityButton}"
+                                        Click="CopyIpButton_Click" />
+                            </Grid>
+
+                            <Grid Grid.Row="2" Margin="0,1,0,0">
+                                <TextBlock Text="Hospedado na Enxada Host"
+                                           Foreground="#AFC2D2"
+                                           FontSize="11"
+                                           VerticalAlignment="Center" />
+                                <Border HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Padding="7,0"
+                                        CornerRadius="4"
+                                        Background="#2413A7FF"
+                                        BorderBrush="#3662B7DD"
+                                        BorderThickness="1">
+                                    <TextBlock x:Name="ManifestText"
+                                               Foreground="#D8F6FF"
+                                               FontSize="10"
+                                               FontWeight="Bold" />
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="2"
+                            CornerRadius="7"
+                            BorderBrush="#4A77A7C4"
+                            BorderThickness="1"
+                            Padding="12,7">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#BB08131D" Offset="0" />
+                                <GradientStop Color="#DD091A26" Offset="0.55" />
+                                <GradientStop Color="#B8041018" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000"
+                                              BlurRadius="18"
+                                              ShadowDepth="4"
+                                              Opacity="0.55" />
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="17" />
+                                <RowDefinition Height="33" />
+                                <RowDefinition Height="11" />
+                            </Grid.RowDefinitions>
+
+                            <Border Height="1"
+                                    VerticalAlignment="Top"
+                                    Background="#68BDEBFF"
+                                    Opacity="0.65" />
+
+                            <TextBlock Text="COMUNIDADE"
+                                       Foreground="{StaticResource CyanBrush}"
+                                       FontSize="11"
+                                       FontWeight="Black"
+                                       VerticalAlignment="Center" />
+                            <TextBlock x:Name="PackSummaryText"
+                                       Text="Manifest pendente"
+                                       Foreground="#FFFFFF"
+                                       FontSize="12"
+                                       FontWeight="Black"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxWidth="205" />
+
+                            <StackPanel Grid.Row="1"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <Button Content="Discord"
+                                        Style="{StaticResource FooterLinkButton}"
+                                        Click="DiscordButton_Click" />
+                                <Button Content="Site"
+                                        Style="{StaticResource FooterLinkButton}"
+                                        Margin="10,0,0,0"
+                                        Click="WebsiteButton_Click" />
+                            </StackPanel>
+
+                            <TextBlock x:Name="RamText"
+                                       Grid.Row="2"
+                                       Foreground="#B6C9DA"
+                                       FontSize="11"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Bottom" />
+
                         <TextBox x:Name="LogTextBox"
-                                 Height="32"
-                                 Margin="0,7,0,0"
-                                 Background="#66000000"
-                                 BorderBrush="#304B68"
-                                 Foreground="#AABDD0"
-                                 FontFamily="Consolas"
-                                 FontSize="10"
-                                 IsReadOnly="True"
-                                 TextWrapping="NoWrap"
-                                 VerticalScrollBarVisibility="Disabled"
-                                 Visibility="Collapsed" />
-                    </StackPanel>
+                                  Height="32"
+                                  Margin="0"
+                                  Background="#66000000"
+                                  BorderBrush="#304B68"
+                                  Foreground="#AABDD0"
+                                  FontFamily="Consolas"
+                                  FontSize="10"
+                                  IsReadOnly="True"
+                                  TextWrapping="NoWrap"
+                                  VerticalScrollBarVisibility="Disabled"
+                                  Visibility="Collapsed" />
+                        </Grid>
+                    </Border>
                 </Grid>
             </Grid>
         </Grid>
