@@ -177,6 +177,7 @@ public partial class MainWindow : Window
         var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
 
         var versionId = await LauncherRuntime.InstallOrUpdateAsync(http, launcher, manifest, gameDir, SetStatus, SetByteProgress);
+        await MinecraftProfileConfigurator.ConfigureAsync(gameDir, settings, SetStatus);
 
         ProgressBar.IsIndeterminate = false;
         ProgressBar.Value = 100;

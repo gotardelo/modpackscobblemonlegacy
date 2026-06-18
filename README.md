@@ -21,6 +21,11 @@ enx-cirion-16.enx.host:10068
 
 O launcher cria a pasta do jogo em `%APPDATA%\.cobblemonlegacy` e a configuracao em `%APPDATA%\CobblemonLegacyLauncher\launcher.settings.json`.
 
+Ao jogar/atualizar, o launcher tambem:
+
+- adiciona o Cobblemon Legacy automaticamente na lista de servidores do Multiplayer;
+- aplica uma vez um preset inicial de performance mais leve em `options.txt`.
+
 ## Manifest do modpack
 
 O launcher procura primeiro o manifest remoto:
