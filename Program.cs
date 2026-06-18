@@ -129,7 +129,19 @@ internal static class Program
         });
 
         process.Start();
-        Console.WriteLine($"Minecraft iniciado como '{settings.OfflineUsername}'.");
+        Console.WriteLine($"Minecraft iniciado como '{settings.OfflineUsername}' (PID {process.Id}).");
+        Console.WriteLine("Se a janela nao aparecer na frente, confira o Alt+Tab ou a barra de tarefas.");
+
+        await Task.Delay(TimeSpan.FromSeconds(10));
+        if (process.HasExited)
+        {
+            Console.WriteLine($"Minecraft fechou rapidamente com codigo {process.ExitCode}.");
+            Console.WriteLine("Veja os logs em %APPDATA%\\.cobblemonlegacy\\logs.");
+        }
+        else
+        {
+            Console.WriteLine("Minecraft continua em execucao. Se ficar travado, aumente a RAM ou veja latest.log/crash-reports.");
+        }
     }
 
     private static LauncherCommand ResolveCommand(string[] args)
@@ -214,6 +226,8 @@ internal enum LauncherCommand
 
 internal sealed class LauncherSettings
 {
+    private const int RecommendedRamMb = 8192;
+
     public static string SettingsPath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "CobblemonLegacyLauncher",
@@ -222,7 +236,7 @@ internal sealed class LauncherSettings
     public string ManifestUrl { get; set; } = ProgramDefaults.ManifestUrl;
     public string GameDirectory { get; set; } = "%APPDATA%\\.cobblemonlegacy";
     public string OfflineUsername { get; set; } = "Player";
-    public int MaximumRamMb { get; set; } = 4096;
+    public int MaximumRamMb { get; set; } = RecommendedRamMb;
 
     public static async Task<LauncherSettings> LoadAsync(JsonSerializerOptions jsonOptions)
     {
@@ -236,10 +250,21 @@ internal sealed class LauncherSettings
 
         var json = await File.ReadAllTextAsync(SettingsPath, Encoding.UTF8);
         var loaded = JsonSerializer.Deserialize<LauncherSettings>(json, jsonOptions) ?? new LauncherSettings();
-        loaded.MaximumRamMb = Math.Max(1024, loaded.MaximumRamMb);
+        var normalized = false;
+
+        if (loaded.MaximumRamMb < RecommendedRamMb)
+        {
+            loaded.MaximumRamMb = RecommendedRamMb;
+            normalized = true;
+        }
+
         loaded.OfflineUsername = string.IsNullOrWhiteSpace(loaded.OfflineUsername) ? "Player" : loaded.OfflineUsername.Trim();
         loaded.ManifestUrl = string.IsNullOrWhiteSpace(loaded.ManifestUrl) ? ProgramDefaults.ManifestUrl : loaded.ManifestUrl.Trim();
         loaded.GameDirectory = string.IsNullOrWhiteSpace(loaded.GameDirectory) ? "%APPDATA%\\.cobblemonlegacy" : loaded.GameDirectory.Trim();
+
+        if (normalized)
+            await File.WriteAllTextAsync(SettingsPath, JsonSerializer.Serialize(loaded, jsonOptions), Encoding.UTF8);
+
         return loaded;
     }
 }
