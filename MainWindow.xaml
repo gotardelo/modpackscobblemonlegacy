@@ -20,6 +20,11 @@
                           BlurRadius="18"
                           ShadowDepth="2"
                           Opacity="0.9" />
+        <DropShadowEffect x:Key="LogoShadow"
+                          Color="#0048AE"
+                          BlurRadius="6"
+                          ShadowDepth="3"
+                          Opacity="0.95" />
 
         <Style x:Key="ChromeButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
             <Setter Property="Width" Value="34" />
@@ -37,26 +42,39 @@
             <Setter Property="Padding" Value="18,0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Foreground" Value="#F3FAFF" />
+            <Setter Property="FontFamily" Value="{StaticResource GameUiFont}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Grid>
+                            <Border x:Name="ButtonGlow"
+                                    Margin="-2,0,-2,0"
+                                    CornerRadius="8"
+                                    Background="#184FE6FF"
+                                    Opacity="0.18">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#31D8FF"
+                                                      BlurRadius="18"
+                                                      ShadowDepth="0"
+                                                      Opacity="0.65" />
+                                </Border.Effect>
+                            </Border>
                             <Border x:Name="ButtonBase"
                                     Margin="0,5,0,0"
                                     CornerRadius="6"
-                                    Background="#082536"
+                                    Background="#052840"
                                     Opacity="0.88" />
                             <Border x:Name="ButtonFace"
                                     Margin="0,0,0,5"
                                     CornerRadius="6"
-                                    BorderBrush="#84BDEBFF"
+                                    BorderBrush="#8CEAF6FF"
                                     BorderThickness="1">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                        <GradientStop Color="#74122636" Offset="0" />
-                                        <GradientStop Color="#A5101C2A" Offset="0.56" />
-                                        <GradientStop Color="#6B0B3550" Offset="1" />
+                                        <GradientStop Color="#7A12314A" Offset="0" />
+                                        <GradientStop Color="#AC10243A" Offset="0.48" />
+                                        <GradientStop Color="#8B0B5A83" Offset="1" />
                                     </LinearGradientBrush>
                                 </Border.Background>
                                 <Grid ClipToBounds="True">
@@ -70,7 +88,8 @@
                                             Opacity="0.28">
                                         <Border.Background>
                                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                                <GradientStop Color="#4EEAFFFF" Offset="0" />
+                                                <GradientStop Color="#6EFFE98A" Offset="0" />
+                                                <GradientStop Color="#36EAFFFF" Offset="0.45" />
                                                 <GradientStop Color="#00EAFFFF" Offset="1" />
                                             </LinearGradientBrush>
                                         </Border.Background>
@@ -84,12 +103,14 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="ButtonFace" Property="BorderBrush" Value="#C8FFFFFF" />
-                                <Setter TargetName="ButtonBase" Property="Background" Value="#095681" />
+                                <Setter TargetName="ButtonBase" Property="Background" Value="#0873A8" />
+                                <Setter TargetName="ButtonGlow" Property="Opacity" Value="0.44" />
                                 <Setter Property="Foreground" Value="#FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="ButtonFace" Property="Margin" Value="0,3,0,2" />
                                 <Setter TargetName="ButtonBase" Property="Opacity" Value="0.55" />
+                                <Setter TargetName="ButtonGlow" Property="Opacity" Value="0.2" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.5" />
@@ -102,34 +123,47 @@
 
         <Style x:Key="PrimaryActionButton" TargetType="Button">
             <Setter Property="Padding" Value="20,0" />
-            <Setter Property="Foreground" Value="#041019" />
+            <Setter Property="Foreground" Value="#07356B" />
+            <Setter Property="FontFamily" Value="{StaticResource GameDisplayFont}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Grid>
+                            <Border x:Name="ButtonAura"
+                                    Margin="-7,-4,-7,-1"
+                                    CornerRadius="10"
+                                    Background="#34FFE25D"
+                                    Opacity="0.42">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FFE25D"
+                                                      BlurRadius="26"
+                                                      ShadowDepth="0"
+                                                      Opacity="0.9" />
+                                </Border.Effect>
+                            </Border>
                             <Border x:Name="ButtonShadow"
                                     Margin="0,7,0,0"
                                     CornerRadius="7"
-                                    Background="#064A76">
+                                    Background="#073B88">
                                 <Border.Effect>
-                                    <DropShadowEffect Color="#000000"
-                                                      BlurRadius="18"
+                                    <DropShadowEffect Color="#001D54"
+                                                      BlurRadius="20"
                                                       ShadowDepth="4"
-                                                      Opacity="0.65" />
+                                                      Opacity="0.9" />
                                 </Border.Effect>
                             </Border>
                             <Border x:Name="ButtonFace"
                                     Margin="0,0,0,7"
                                     CornerRadius="7"
-                                    BorderBrush="#D2F8FF"
-                                    BorderThickness="1">
+                                    BorderBrush="#fff6b6"
+                                    BorderThickness="2">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#B7F9FF" Offset="0" />
-                                        <GradientStop Color="#33C8FF" Offset="0.42" />
-                                        <GradientStop Color="#0B82D6" Offset="0.78" />
-                                        <GradientStop Color="#0760A4" Offset="1" />
+                                        <GradientStop Color="#FFF8A8" Offset="0" />
+                                        <GradientStop Color="#FFD84F" Offset="0.44" />
+                                        <GradientStop Color="#F3A911" Offset="0.8" />
+                                        <GradientStop Color="#C98509" Offset="1" />
                                     </LinearGradientBrush>
                                 </Border.Background>
                                 <Grid ClipToBounds="True">
@@ -143,7 +177,8 @@
                                             Opacity="0.28">
                                         <Border.Background>
                                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                                <GradientStop Color="#FFFFFFFF" Offset="0" />
+                                                <GradientStop Color="#DFFFFFFF" Offset="0" />
+                                                <GradientStop Color="#50FFFFFF" Offset="0.44" />
                                                 <GradientStop Color="#00FFFFFF" Offset="1" />
                                             </LinearGradientBrush>
                                         </Border.Background>
@@ -157,10 +192,13 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="ButtonFace" Property="BorderBrush" Value="#FFFFFF" />
-                                <Setter TargetName="ButtonShadow" Property="Background" Value="#087FBD" />
+                                <Setter TargetName="ButtonShadow" Property="Background" Value="#0758C9" />
+                                <Setter TargetName="ButtonAura" Property="Opacity" Value="0.78" />
+                                <Setter Property="Foreground" Value="#062B63" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="ButtonFace" Property="Margin" Value="0,5,0,2" />
+                                <Setter TargetName="ButtonAura" Property="Opacity" Value="0.34" />
                                 <Setter TargetName="ButtonShadow" Property="Opacity" Value="0.58" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
@@ -323,19 +361,19 @@
                             VerticalAlignment="Center"
                             Margin="0,4,0,0">
                     <TextBlock Text="COBBLEMON"
-                               Foreground="#D7D9DA"
-                               FontFamily="Segoe UI Black"
-                               FontSize="47"
+                               Foreground="#FFE768"
+                               FontFamily="{StaticResource GameDisplayFont}"
+                               FontSize="50"
                                FontWeight="Black"
                                TextAlignment="Center"
-                               Effect="{StaticResource TitleShadow}" />
+                               Effect="{StaticResource LogoShadow}" />
                     <TextBlock Text="LEGACY"
-                               Foreground="#F1F3F4"
-                               FontFamily="Segoe UI Black"
-                               FontSize="40"
+                               Foreground="#FFFFFF"
+                               FontFamily="{StaticResource GameDisplayFont}"
+                               FontSize="43"
                                FontWeight="Black"
                                TextAlignment="Center"
-                               Margin="0,-14,0,0"
+                               Margin="0,-13,0,0"
                                Effect="{StaticResource TitleShadow}" />
                 </StackPanel>
 
@@ -381,8 +419,9 @@
                         <StackPanel>
                             <TextBlock Text="Opções de Login"
                                        Foreground="#FFFFFF"
+                                       FontFamily="{StaticResource GameDisplayFont}"
                                        FontSize="24"
-                                       FontWeight="Bold"
+                                       FontWeight="Normal"
                                        TextAlignment="Center"
                                        Effect="{StaticResource TitleShadow}" />
 
@@ -481,8 +520,8 @@
                                     Height="52"
                                     Margin="0,12,0,0"
                                     Style="{StaticResource PrimaryActionButton}"
-                                    FontSize="19"
-                                    FontWeight="Black"
+                                    FontSize="26"
+                                    FontWeight="Normal"
                                     Visibility="Collapsed"
                                     Click="PlayButton_Click" />
 

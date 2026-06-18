@@ -10,9 +10,15 @@
         <SolidColorBrush x:Key="GoldBrush" Color="#E0B35A" />
         <SolidColorBrush x:Key="CoralBrush" Color="#FF5F72" />
         <SolidColorBrush x:Key="CyanBrush" Color="#58D7FF" />
+        <FontFamily x:Key="GameDisplayFont">pack://application:,,,/Assets/Fonts/#Luckiest Guy</FontFamily>
+        <FontFamily x:Key="GameUiFont">pack://application:,,,/Assets/Fonts/#Fredoka</FontFamily>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource GameUiFont}" />
+        </Style>
 
         <Style TargetType="Button">
-            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontFamily" Value="{StaticResource GameUiFont}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="#03101A" />
             <Setter Property="Background" Value="{StaticResource AccentBrush}" />
@@ -54,7 +60,7 @@
         </Style>
 
         <Style TargetType="TextBox">
-            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontFamily" Value="{StaticResource GameUiFont}" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
             <Setter Property="CaretBrush" Value="{StaticResource CyanBrush}" />

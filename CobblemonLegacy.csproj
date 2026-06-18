@@ -19,6 +19,10 @@
     <Resource Include="Assets\launcher-hero-cinematic.png" />
     <Resource Include="Assets\launcher-icon.png" />
     <Resource Include="Assets\launcher-icon.ico" />
+    <Resource Include="Assets\Fonts\Fredoka-Variable.ttf" />
+    <Resource Include="Assets\Fonts\LuckiestGuy-Regular.ttf" />
+    <None Include="Assets\Fonts\Fredoka-OFL.txt" />
+    <None Include="Assets\Fonts\LuckiestGuy-LICENSE.txt" />
   </ItemGroup>
 
 </Project>

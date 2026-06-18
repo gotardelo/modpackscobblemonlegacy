@@ -12,6 +12,7 @@
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
+        Icon="Assets/launcher-icon.ico"
         Background="Transparent">
     <Window.Resources>
         <DropShadowEffect x:Key="TitleShadow"
@@ -47,9 +48,9 @@
             Background="#04080D"
             ClipToBounds="True">
         <Grid>
-            <Image Source="Assets/launcher-hero.png"
+            <Image Source="Assets/launcher-hero-cinematic.png"
                    Stretch="UniformToFill"
-                   Opacity="0.7" />
+                   Opacity="0.78" />
             <Rectangle Fill="#D9000206" />
             <Rectangle Height="104"
                        VerticalAlignment="Top"
@@ -71,17 +72,17 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <TextBlock Text="COBBLEMON"
-                               Foreground="#D7D9DA"
-                               FontFamily="Segoe UI Black"
-                               FontSize="38"
-                               FontWeight="Black"
+                               Foreground="#FFE768"
+                               FontFamily="{StaticResource GameDisplayFont}"
+                               FontSize="42"
+                               FontWeight="Normal"
                                TextAlignment="Center"
                                Effect="{StaticResource TitleShadow}" />
                     <TextBlock Text="LEGACY"
                                Foreground="#F1F3F4"
-                               FontFamily="Segoe UI Black"
-                               FontSize="31"
-                               FontWeight="Black"
+                               FontFamily="{StaticResource GameDisplayFont}"
+                               FontSize="34"
+                               FontWeight="Normal"
                                TextAlignment="Center"
                                Margin="0,-12,0,0"
                                Effect="{StaticResource TitleShadow}" />
@@ -107,8 +108,9 @@
                         <StackPanel>
                             <TextBlock Text="Opções de Login"
                                        Foreground="#FFFFFF"
+                                       FontFamily="{StaticResource GameDisplayFont}"
                                        FontSize="25"
-                                       FontWeight="Bold"
+                                       FontWeight="Normal"
                                        TextAlignment="Center"
                                        Effect="{StaticResource TitleShadow}" />
                             <Button Style="{StaticResource LoginOptionButton}"
@@ -184,8 +186,9 @@
                                 VerticalAlignment="Center">
                         <TextBlock Text="Digite seu nickname"
                                    Foreground="#FFFFFF"
+                                   FontFamily="{StaticResource GameDisplayFont}"
                                    FontSize="24"
-                                   FontWeight="Bold"
+                                   FontWeight="Normal"
                                    TextAlignment="Center"
                                    Effect="{StaticResource TitleShadow}" />
                         <TextBox x:Name="NicknameTextBox"
