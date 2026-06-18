@@ -1,2 +1,3 @@
 @echo off
+echo Abrindo Cobblemon Legacy Launcher...
 "C:\Program Files\dotnet\dotnet.exe" run --project "%~dp0CobblemonLegacy.csproj" -- %*
