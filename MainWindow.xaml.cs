@@ -280,7 +280,8 @@ public partial class MainWindow : Window
             SetStatus("Abrindo Minecraft...");
             var process = await LauncherRuntime.StartGameAsync(launcher, versionId, settings, session, AppendLog);
             AppendLog($"Minecraft iniciado com PID {process.Id}.");
-            SetStatus("Minecraft aberto. A primeira carga pode levar alguns minutos.");
+            SetStatus("Minecraft aberto. O launcher volta quando o jogo fechar.");
+            await HideLauncherUntilGameExitsAsync(process);
             SetPrimaryAction(LauncherPrimaryAction.Ready);
         }
         catch (Exception ex) when (IsMicrosoftAuthCancellation(ex))
@@ -296,6 +297,31 @@ public partial class MainWindow : Window
         finally
         {
             SetBusy(false);
+        }
+    }
+
+    private async Task HideLauncherUntilGameExitsAsync(Process process)
+    {
+        var showInTaskbar = ShowInTaskbar;
+
+        try
+        {
+            ShowInTaskbar = false;
+            Hide();
+
+            if (!process.HasExited)
+                await process.WaitForExitAsync();
+        }
+        finally
+        {
+            if (!isClosing)
+            {
+                ShowInTaskbar = showInTaskbar;
+                Show();
+                WindowState = WindowState.Normal;
+                Activate();
+                SetStatus("Minecraft fechado. Launcher reaberto.");
+            }
         }
     }
 
