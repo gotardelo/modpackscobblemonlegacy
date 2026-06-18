@@ -55,7 +55,7 @@ public partial class MainWindow : Window
             await EnsureAuthChoiceAsync();
             ApplySettingsToUi();
 
-            SetStatus("Pronto para jogar.");
+            SetStatus(HasPlayableProfile() ? "Pronto para jogar." : "Escolha uma conta para liberar o JOGAR.");
             SetBusy(false);
 
             await LoadCachedManifestAsync();
@@ -84,7 +84,14 @@ public partial class MainWindow : Window
 
         if (dialog.SelectedAuthMode == AuthModes.Microsoft)
         {
-            await SignInWithMicrosoftAsync();
+            try
+            {
+                await SignInWithMicrosoftAsync();
+            }
+            catch (Exception ex) when (IsMicrosoftAuthCancellation(ex))
+            {
+                SetStatus("Login Microsoft cancelado. Escolha uma conta para liberar o JOGAR.");
+            }
         }
         else
         {
@@ -240,6 +247,10 @@ public partial class MainWindow : Window
             AppendLog($"Minecraft iniciado com PID {process.Id}.");
             SetStatus("Minecraft aberto. A primeira carga pode levar alguns minutos.");
         }
+        catch (Exception ex) when (IsMicrosoftAuthCancellation(ex))
+        {
+            SetStatus("Login Microsoft cancelado.");
+        }
         catch (Exception ex)
         {
             ShowError(ex.Message);
@@ -365,6 +376,11 @@ public partial class MainWindow : Window
             ShowPlayButton(true);
             SetStatus($"Conta Microsoft conectada: {settings.MicrosoftUsername}. Pode clicar em JOGAR.");
         }
+        catch (Exception ex) when (IsMicrosoftAuthCancellation(ex))
+        {
+            ShowPlayButton(HasPlayableProfile());
+            SetStatus("Login Microsoft cancelado.");
+        }
         catch (Exception ex)
         {
             ShowPlayButton(HasPlayableProfile());
@@ -420,6 +436,21 @@ public partial class MainWindow : Window
         UpdateAccountText();
         ShowPlayButton(HasPlayableProfile());
         return session;
+    }
+
+    private static bool IsMicrosoftAuthCancellation(Exception ex)
+    {
+        if (ex is OperationCanceledException)
+            return true;
+
+        if (ex is AggregateException aggregateException)
+            return aggregateException.Flatten().InnerExceptions.Any(IsMicrosoftAuthCancellation);
+
+        var message = ex.Message;
+        return message.Contains("operation was canceled", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("operation was cancelled", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("authentication canceled", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("authentication cancelled", StringComparison.OrdinalIgnoreCase);
     }
 
     private void DiscordButton_Click(object sender, RoutedEventArgs e)
