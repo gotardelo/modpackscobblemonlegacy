@@ -28,7 +28,7 @@ Ao atualizar/jogar, o launcher tambem:
 O launcher procura primeiro o manifest remoto:
 
 ```txt
-https://raw.githubusercontent.com/gotardelo/modpackscobblemonlegacy/main/manifest.json
+https://raw.githubusercontent.com/gotardelo/cobblemonlegacy-downloads/main/manifest.json
 ```
 
 Se nao conseguir baixar, ele usa o `manifest.json` local do projeto/executavel.
@@ -45,7 +45,7 @@ pack/shaderpacks/
 Depois gere o manifest com hashes:
 
 ```powershell
-.\tools\New-ModpackManifest.ps1 -Version "1.0.0" -ReleaseBaseUrl "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0"
+.\tools\New-ModpackManifest.ps1 -Version "1.0.0" -ReleaseBaseUrl "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0"
 ```
 
 Suba os arquivos dentro de `pack/mods`, `pack/resourcepacks`, `pack/config` e `pack/shaderpacks` como assets da GitHub Release. O manifest guarda o destino local completo, mas a URL da release usa o nome do arquivo.

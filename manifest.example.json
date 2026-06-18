@@ -6,14 +6,14 @@
   "files": [
     {
       "path": "mods/example-mod.jar",
-      "url": "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/example-mod.jar",
+      "url": "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/example-mod.jar",
       "sha256": "replace-with-sha256",
       "size": 123456,
       "required": true
     },
     {
       "path": "resourcepacks/example-pack.zip",
-      "url": "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0/example-pack.zip",
+      "url": "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/example-pack.zip",
       "sha256": "replace-with-sha256",
       "size": 123456,
       "required": true

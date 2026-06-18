@@ -402,7 +402,7 @@ internal sealed class LauncherSettings
 
 internal static class ProgramDefaults
 {
-    public const string ManifestUrl = "https://raw.githubusercontent.com/gotardelo/modpackscobblemonlegacy/main/manifest.json";
+    public const string ManifestUrl = "https://raw.githubusercontent.com/gotardelo/cobblemonlegacy-downloads/main/manifest.json";
     public const string FabricMetaBaseUrl = "https://meta.fabricmc.net/v2";
 }
 

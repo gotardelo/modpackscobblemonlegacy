@@ -5,7 +5,7 @@ param(
     [string]$Version = "1.0.0",
     [string]$MinecraftVersion = "1.21.1",
     [string]$FabricLoaderVersion = "latest",
-    [string]$ReleaseBaseUrl = "https://github.com/gotardelo/modpackscobblemonlegacy/releases/download/v1.0.0"
+    [string]$ReleaseBaseUrl = "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0"
 )
 
 $ErrorActionPreference = "Stop"
