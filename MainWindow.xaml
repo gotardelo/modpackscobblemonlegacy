@@ -32,12 +32,53 @@
         </Style>
 
         <Style x:Key="LoginOptionButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="Height" Value="54" />
+            <Setter Property="Height" Value="50" />
             <Setter Property="Padding" Value="18,0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Foreground" Value="#F3FAFF" />
-            <Setter Property="Background" Value="#36070D12" />
-            <Setter Property="BorderBrush" Value="#7C7892A6" />
+            <Setter Property="Background" Value="#4A07111B" />
+            <Setter Property="BorderBrush" Value="#7F7FA6BD" />
+        </Style>
+
+        <Style x:Key="FooterLinkButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="#EAF6FF" />
+            <Setter Property="Background" Value="#50101C2A" />
+            <Setter Property="BorderBrush" Value="#577AA8C4" />
+        </Style>
+
+        <Style x:Key="LauncherProgressBar" TargetType="ProgressBar">
+            <Setter Property="Height" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource CyanBrush}" />
+            <Setter Property="Background" Value="#5B0A111A" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid ClipToBounds="True">
+                            <Border x:Name="PART_Track"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="#526E95"
+                                    BorderThickness="1"
+                                    CornerRadius="4" />
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    CornerRadius="4"
+                                    Margin="1">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#15A9FF" Offset="0" />
+                                        <GradientStop Color="#64E8FF" Offset="0.55" />
+                                        <GradientStop Color="#A8F1FF" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -123,19 +164,28 @@
                 <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="390" />
+                        <ColumnDefinition Width="430" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="1"
-                            Width="390"
+                            Width="430"
                             VerticalAlignment="Center"
-                            Padding="0,2,0,0"
-                            Background="#00000000">
+                            Padding="18,14"
+                            CornerRadius="7"
+                            Background="#66050910"
+                            BorderBrush="#3F6E91AF"
+                            BorderThickness="1">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000"
+                                              BlurRadius="24"
+                                              ShadowDepth="0"
+                                              Opacity="0.55" />
+                        </Border.Effect>
                         <StackPanel>
                             <TextBlock Text="Opções de Login"
                                        Foreground="#FFFFFF"
-                                       FontSize="25"
+                                       FontSize="24"
                                        FontWeight="Bold"
                                        TextAlignment="Center"
                                        Effect="{StaticResource TitleShadow}" />
@@ -150,7 +200,7 @@
                                        Visibility="Collapsed" />
 
                             <Button Style="{StaticResource LoginOptionButton}"
-                                    Margin="0,24,0,0"
+                                    Margin="0,18,0,0"
                                     Click="MicrosoftModeButton_Click">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -183,7 +233,7 @@
                             </Button>
 
                             <Button Style="{StaticResource LoginOptionButton}"
-                                    Margin="0,12,0,0"
+                                    Margin="0,8,0,0"
                                     Click="OfflineModeButton_Click">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -232,27 +282,34 @@
 
                             <Button x:Name="PlayButton"
                                     Content="JOGAR"
-                                    Height="58"
-                                    Margin="0,20,0,0"
+                                    Height="52"
+                                    Margin="0,12,0,0"
                                     FontSize="19"
                                     FontWeight="Black"
                                     Visibility="Collapsed"
                                     Click="PlayButton_Click" />
 
-                            <Button Content="Atualizar pack"
+                            <Button x:Name="UpdateButton"
+                                    Content="Atualizar pack"
                                     Style="{StaticResource SecondaryButton}"
-                                    Height="40"
-                                    Margin="0,10,0,0"
+                                    Height="36"
+                                    Margin="0,8,0,0"
                                     Click="UpdateButton_Click" />
 
-                            <ProgressBar x:Name="ProgressBar"
-                                         Height="8"
-                                         Margin="0,16,0,0"
-                                         Minimum="0"
-                                         Maximum="100"
-                                         Value="0"
-                                         Foreground="{StaticResource CyanBrush}"
-                                         Background="#222934" />
+                            <Grid Margin="0,10,0,0">
+                                <ProgressBar x:Name="ProgressBar"
+                                             Style="{StaticResource LauncherProgressBar}"
+                                             Minimum="0"
+                                             Maximum="100"
+                                             Value="0" />
+                                <TextBlock x:Name="ProgressPercentText"
+                                           Text="0%"
+                                           Foreground="#EAF6FF"
+                                           FontSize="10"
+                                           FontWeight="Bold"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Grid>
 
                             <TextBlock x:Name="StatusText"
                                        Text="Inicializando..."
@@ -260,7 +317,7 @@
                                        TextWrapping="Wrap"
                                        TextAlignment="Center"
                                        FontSize="13"
-                                       Margin="0,9,0,0" />
+                                       Margin="0,6,0,0" />
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -325,6 +382,17 @@
                                    FontSize="12"
                                    HorizontalAlignment="Right"
                                    Margin="0,4,0,0" />
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,8,0,0">
+                            <Button Content="Discord"
+                                    Style="{StaticResource FooterLinkButton}"
+                                    Click="DiscordButton_Click" />
+                            <Button Content="Site"
+                                    Style="{StaticResource FooterLinkButton}"
+                                    Margin="10,0,0,0"
+                                    Click="WebsiteButton_Click" />
+                        </StackPanel>
                         <TextBox x:Name="LogTextBox"
                                  Height="32"
                                  Margin="0,7,0,0"
@@ -335,7 +403,8 @@
                                  FontSize="10"
                                  IsReadOnly="True"
                                  TextWrapping="NoWrap"
-                                 VerticalScrollBarVisibility="Disabled" />
+                                 VerticalScrollBarVisibility="Disabled"
+                                 Visibility="Collapsed" />
                     </StackPanel>
                 </Grid>
             </Grid>

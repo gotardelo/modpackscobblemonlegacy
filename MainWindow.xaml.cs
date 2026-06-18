@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -378,6 +379,31 @@ public partial class MainWindow : Window
         SetStatus("IP copiado.");
     }
 
+    private void DiscordButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenExternalUrl("https://discord.gg/sETS2Fc7Ey");
+    }
+
+    private void WebsiteButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenExternalUrl("https://www.cobblemonlegacy.com.br");
+    }
+
+    private void OpenExternalUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url)
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Nao foi possivel abrir o link: {ex.Message}");
+        }
+    }
+
     private async Task RefreshServerStatusLoopAsync(CancellationToken cancellationToken)
     {
         try
@@ -456,7 +482,9 @@ public partial class MainWindow : Window
     {
         isBusy = value;
         PlayButton.IsEnabled = !value;
+        UpdateButton.IsEnabled = !value;
         ProgressBar.IsIndeterminate = value;
+        ProgressPercentText.Text = value ? "..." : $"{ProgressBar.Value:0}%";
     }
 
     private void SetStatus(string message)
@@ -474,6 +502,7 @@ public partial class MainWindow : Window
         {
             ProgressBar.IsIndeterminate = false;
             ProgressBar.Value = Math.Clamp(current * 100d / total, 0, 100);
+            ProgressPercentText.Text = $"{ProgressBar.Value:0}%";
             StatusText.Text = $"Download: {LauncherRuntime.FormatBytes(current)} / {LauncherRuntime.FormatBytes(total)}";
         });
     }
