@@ -10,8 +10,8 @@
         <SolidColorBrush x:Key="GoldBrush" Color="#E0B35A" />
         <SolidColorBrush x:Key="CoralBrush" Color="#FF5F72" />
         <SolidColorBrush x:Key="CyanBrush" Color="#58D7FF" />
-        <FontFamily x:Key="GameDisplayFont">pack://application:,,,/Assets/Fonts/#Luckiest Guy</FontFamily>
-        <FontFamily x:Key="GameUiFont">pack://application:,,,/Assets/Fonts/#Fredoka</FontFamily>
+        <FontFamily x:Key="GameDisplayFont">pack://application:,,,/Assets/Fonts/#Oxanium</FontFamily>
+        <FontFamily x:Key="GameUiFont">pack://application:,,,/Assets/Fonts/#Rajdhani</FontFamily>
 
         <Style TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{StaticResource GameUiFont}" />
@@ -29,20 +29,28 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="5">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
-                        </Border>
+                        <Grid>
+                            <Border x:Name="ButtonBase"
+                                    Margin="0,4,0,0"
+                                    Background="#021018"
+                                    CornerRadius="5" />
+                            <Border x:Name="ButtonFace"
+                                    Margin="0,0,0,4"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="5">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}" />
+                            </Border>
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#43BEFF" />
+                                <Setter TargetName="ButtonFace" Property="BorderBrush" Value="#FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#087CD0" />
+                                <Setter TargetName="ButtonFace" Property="Margin" Value="0,3,0,1" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45" />
@@ -55,8 +63,8 @@
 
         <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
-            <Setter Property="Background" Value="#2A101923" />
-            <Setter Property="BorderBrush" Value="#5E7187" />
+            <Setter Property="Background" Value="#7A071520" />
+            <Setter Property="BorderBrush" Value="#5AA7D7EA" />
         </Style>
 
         <Style TargetType="TextBox">
