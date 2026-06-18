@@ -13,4 +13,8 @@
     <PackageReference Include="CmlLib.Core.Auth.Microsoft" Version="3.3.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="Assets\launcher-hero.png" />
+  </ItemGroup>
+
 </Project>

@@ -1,5 +1,9 @@
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
 
 namespace CobblemonLegacy;
 
@@ -49,5 +53,37 @@ public partial class LoginChoiceWindow : Window
         NicknameErrorText.Text = "";
         NicknamePanel.Visibility = Visibility.Collapsed;
         ChoicePanel.Visibility = Visibility.Visible;
+    }
+
+    private void WindowChrome_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (IsFromInteractiveControl(e.OriginalSource as DependencyObject))
+            return;
+
+        if (e.ButtonState == MouseButtonState.Pressed)
+            DragMove();
+    }
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        DialogResult = false;
+    }
+
+    private static bool IsFromInteractiveControl(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is ButtonBase or TextBoxBase)
+                return true;
+
+            source = VisualTreeHelper.GetParent(source);
+        }
+
+        return false;
     }
 }

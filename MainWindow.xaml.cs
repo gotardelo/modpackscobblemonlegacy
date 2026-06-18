@@ -1,6 +1,10 @@
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
 using CmlLib.Core.Auth;
 using CmlLib.Core.Auth.Microsoft;
 
@@ -282,6 +286,38 @@ public partial class MainWindow : Window
     {
         Clipboard.SetText(LauncherRuntime.ServerIp);
         SetStatus("IP copiado.");
+    }
+
+    private void WindowChrome_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (IsFromInteractiveControl(e.OriginalSource as DependencyObject))
+            return;
+
+        if (e.ButtonState == MouseButtonState.Pressed)
+            DragMove();
+    }
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private static bool IsFromInteractiveControl(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is ButtonBase or TextBoxBase or System.Windows.Controls.ProgressBar)
+                return true;
+
+            source = VisualTreeHelper.GetParent(source);
+        }
+
+        return false;
     }
 
     private void SetBusy(bool value)
