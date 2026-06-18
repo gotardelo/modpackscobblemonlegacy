@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private readonly CancellationTokenSource serverStatusCancellation = new();
     private LauncherSettings? settings;
     private ModpackManifest? manifest;
+    private MSession? microsoftSession;
     private bool isBusy;
     private bool isClosing;
 
@@ -79,18 +80,20 @@ public partial class MainWindow : Window
         };
 
         if (dialog.ShowDialog() != true)
+            return;
+
+        if (dialog.SelectedAuthMode == AuthModes.Microsoft)
         {
-            settings.AuthMode = AuthModes.Offline;
-            settings.OfflineUsername = "Player";
+            await SignInWithMicrosoftAsync();
         }
         else
         {
             settings.AuthMode = dialog.SelectedAuthMode;
             if (settings.AuthMode == AuthModes.Offline)
                 settings.OfflineUsername = dialog.OfflineNickname;
-        }
 
-        await settings.SaveAsync(LauncherRuntime.JsonOptions);
+            await settings.SaveAsync(LauncherRuntime.JsonOptions);
+        }
     }
 
     private async Task LoadCachedManifestAsync()
@@ -155,7 +158,7 @@ public partial class MainWindow : Window
 
         NicknameTextBox.Text = settings.OfflineUsername;
         ShowNicknameEditor(false);
-        ShowPlayButton(false);
+        ShowPlayButton(HasPlayableProfile());
         RamText.Text = $"RAM: {settings.MaximumRamMb} MB";
         UpdateAccountText();
     }
@@ -165,12 +168,27 @@ public partial class MainWindow : Window
         if (settings is null)
             return;
 
+        var hasProfile = !string.IsNullOrWhiteSpace(settings.AuthMode);
+        AccountText.Visibility = hasProfile ? Visibility.Visible : Visibility.Collapsed;
         AccountText.Text = settings.AuthMode switch
         {
-            AuthModes.Microsoft when !string.IsNullOrWhiteSpace(settings.MicrosoftUsername) => $"Microsoft: {settings.MicrosoftUsername}",
-            AuthModes.Microsoft => "Microsoft selecionado",
-            AuthModes.Offline => $"Nickname: {settings.OfflineUsername}",
+            AuthModes.Microsoft when !string.IsNullOrWhiteSpace(settings.MicrosoftUsername) => $"Perfil Microsoft: {settings.MicrosoftUsername}",
+            AuthModes.Microsoft => "Conecte sua conta Microsoft",
+            AuthModes.Offline => $"Perfil offline: {settings.OfflineUsername}",
             _ => "Nenhuma conta selecionada"
+        };
+    }
+
+    private bool HasPlayableProfile()
+    {
+        if (settings is null)
+            return false;
+
+        return settings.AuthMode switch
+        {
+            AuthModes.Microsoft => !string.IsNullOrWhiteSpace(settings.MicrosoftUsername),
+            AuthModes.Offline => NicknameRegex.IsMatch(settings.OfflineUsername),
+            _ => false
         };
     }
 
@@ -280,15 +298,10 @@ public partial class MainWindow : Window
 
         if (settings.AuthMode == AuthModes.Microsoft)
         {
-            ShowNicknameEditor(false);
-            SetStatus("Abrindo login Microsoft...");
-            AppendLog("Login Microsoft iniciado.");
-            var loginHandler = JELoginHandlerBuilder.BuildDefault();
-            var session = await loginHandler.Authenticate();
-            settings.MicrosoftUsername = string.IsNullOrWhiteSpace(session.Username) ? "Conta Microsoft" : session.Username;
-            await settings.SaveAsync(LauncherRuntime.JsonOptions);
-            UpdateAccountText();
-            return session;
+            if (microsoftSession is not null)
+                return microsoftSession;
+
+            return await SignInWithMicrosoftAsync();
         }
 
         if (!NicknameRegex.IsMatch(settings.OfflineUsername))
@@ -310,8 +323,11 @@ public partial class MainWindow : Window
             throw new InvalidOperationException("Nickname invalido. Use 3 a 16 caracteres: letras, numeros ou underline.");
 
         settings.OfflineUsername = nickname;
+        settings.MicrosoftUsername = "";
+        microsoftSession = null;
         await settings.SaveAsync(LauncherRuntime.JsonOptions);
         UpdateAccountText();
+        ShowPlayButton(HasPlayableProfile());
     }
 
     private async void SaveNicknameButton_Click(object sender, RoutedEventArgs e)
@@ -324,8 +340,7 @@ public partial class MainWindow : Window
             settings.AuthMode = AuthModes.Offline;
             await SaveOfflineNicknameIfNeededAsync();
             ShowNicknameEditor(false);
-            ShowPlayButton(true);
-            SetStatus("Nickname salvo.");
+            SetStatus($"Perfil offline salvo: {settings.OfflineUsername}.");
         }
         catch (Exception ex)
         {
@@ -340,16 +355,24 @@ public partial class MainWindow : Window
             if (settings is null)
                 return;
 
-            settings.AuthMode = AuthModes.Microsoft;
-            await settings.SaveAsync(LauncherRuntime.JsonOptions);
+            if (isBusy)
+                return;
+
+            SetBusy(true);
+            ProgressBar.IsIndeterminate = true;
             ShowNicknameEditor(false);
+            await SignInWithMicrosoftAsync();
             ShowPlayButton(true);
-            UpdateAccountText();
-            SetStatus("Microsoft selecionado. O login abre quando voce clicar em Jogar.");
+            SetStatus($"Conta Microsoft conectada: {settings.MicrosoftUsername}. Pode clicar em JOGAR.");
         }
         catch (Exception ex)
         {
+            ShowPlayButton(HasPlayableProfile());
             ShowError(ex.Message);
+        }
+        finally
+        {
+            SetBusy(false);
         }
     }
 
@@ -360,9 +383,7 @@ public partial class MainWindow : Window
             if (settings is null)
                 return;
 
-            settings.AuthMode = AuthModes.Offline;
-            await settings.SaveAsync(LauncherRuntime.JsonOptions);
-            UpdateAccountText();
+            NicknameTextBox.Text = settings.OfflineUsername;
             ShowNicknameEditor(true);
             ShowPlayButton(false);
             SetStatus("Digite seu nickname e clique em Salvar.");
@@ -377,6 +398,28 @@ public partial class MainWindow : Window
     {
         Clipboard.SetText(LauncherRuntime.ServerIp);
         SetStatus("IP copiado.");
+    }
+
+    private async Task<MSession> SignInWithMicrosoftAsync()
+    {
+        if (settings is null)
+            throw new InvalidOperationException("Configuracao nao carregada.");
+
+        ShowNicknameEditor(false);
+        SetStatus("Abrindo login Microsoft...");
+        AppendLog("Login Microsoft iniciado.");
+
+        var loginHandler = JELoginHandlerBuilder.BuildDefault();
+        var session = await loginHandler.Authenticate();
+
+        microsoftSession = session;
+        settings.AuthMode = AuthModes.Microsoft;
+        settings.MicrosoftUsername = string.IsNullOrWhiteSpace(session.Username) ? "Conta Microsoft" : session.Username;
+        await settings.SaveAsync(LauncherRuntime.JsonOptions);
+
+        UpdateAccountText();
+        ShowPlayButton(HasPlayableProfile());
+        return session;
     }
 
     private void DiscordButton_Click(object sender, RoutedEventArgs e)
