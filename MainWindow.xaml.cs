@@ -15,6 +15,8 @@ namespace CobblemonLegacy;
 
 public partial class MainWindow : Window
 {
+    private const int MaxVisibleLogCharacters = 12_000;
+    private const long MaxUiLogBytes = 512 * 1024;
     private static readonly Regex NicknameRegex = new("^[A-Za-z0-9_]{3,16}$", RegexOptions.Compiled);
     private static readonly string UiLogPath = Path.Combine(
         Path.GetDirectoryName(LauncherSettings.SettingsPath)!,
@@ -45,17 +47,18 @@ public partial class MainWindow : Window
     {
         try
         {
-            SetBusy(true);
             AppendLog("Inicializando launcher...");
 
             settings = await LauncherSettings.LoadAsync(LauncherRuntime.JsonOptions);
             await EnsureAuthChoiceAsync();
             ApplySettingsToUi();
-            await LoadManifestAsync();
-            _ = RefreshServerStatusLoopAsync(serverStatusCancellation.Token);
 
             SetStatus("Pronto para jogar.");
             SetBusy(false);
+
+            await LoadCachedManifestAsync();
+            _ = LoadManifestInBackgroundAsync(serverStatusCancellation.Token);
+            _ = RefreshServerStatusLoopAsync(serverStatusCancellation.Token);
         }
         catch (Exception ex)
         {
@@ -89,18 +92,59 @@ public partial class MainWindow : Window
         await settings.SaveAsync(LauncherRuntime.JsonOptions);
     }
 
-    private async Task LoadManifestAsync()
+    private async Task LoadCachedManifestAsync()
+    {
+        var cachedManifest = await ModpackManifestLoader.TryLoadCachedAsync(LauncherRuntime.JsonOptions);
+        if (cachedManifest is null)
+            return;
+
+        manifest = cachedManifest;
+        ApplyManifestToUi(cachedManifest);
+        AppendLog("Manifest em cache carregado.");
+    }
+
+    private async Task LoadManifestInBackgroundAsync(CancellationToken cancellationToken)
     {
         if (settings is null)
             return;
 
-        manifest = await ModpackManifestLoader.LoadAsync(http, settings.ManifestUrl, LauncherRuntime.JsonOptions, AppendLog);
-        var mods = manifest.Files.Count(file => file.Path.StartsWith("mods/", StringComparison.OrdinalIgnoreCase));
-        var resourcepacks = manifest.Files.Count(file => file.Path.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase));
+        try
+        {
+            var loadedManifest = await ModpackManifestLoader.LoadAsync(http, settings.ManifestUrl, LauncherRuntime.JsonOptions, AppendLog);
+            if (cancellationToken.IsCancellationRequested)
+                return;
 
-        ManifestText.Text = $"v{manifest.Version}";
+            manifest = loadedManifest;
+            Dispatcher.Invoke(() => ApplyManifestToUi(loadedManifest));
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Manifest remoto indisponivel: {ex.Message}");
+        }
+    }
+
+    private void ApplyManifestToUi(ModpackManifest loadedManifest)
+    {
+        var mods = loadedManifest.Files.Count(file => file.Path.StartsWith("mods/", StringComparison.OrdinalIgnoreCase));
+        var resourcepacks = loadedManifest.Files.Count(file => file.Path.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase));
+
+        ManifestText.Text = $"v{loadedManifest.Version}";
         PackSummaryText.Text = $"{mods} mods | {resourcepacks} resourcepacks";
         AppendLog($"Manifest carregado: {mods} mods, {resourcepacks} resourcepacks.");
+    }
+
+    private async Task<ModpackManifest> EnsureManifestForPlayAsync()
+    {
+        if (manifest is not null)
+            return manifest;
+
+        if (settings is null)
+            throw new InvalidOperationException("Configuracao nao carregada.");
+
+        var loadedManifest = await ModpackManifestLoader.LoadAsync(http, settings.ManifestUrl, LauncherRuntime.JsonOptions, AppendLog);
+        manifest = loadedManifest;
+        ApplyManifestToUi(loadedManifest);
+        return loadedManifest;
     }
 
     private void ApplySettingsToUi()
@@ -213,12 +257,12 @@ public partial class MainWindow : Window
         if (settings is null)
             throw new InvalidOperationException("Configuracao nao carregada.");
 
-        manifest ??= await ModpackManifestLoader.LoadAsync(http, settings.ManifestUrl, LauncherRuntime.JsonOptions, AppendLog);
+        var activeManifest = await EnsureManifestForPlayAsync();
 
         var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
         var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
 
-        var versionId = await LauncherRuntime.InstallOrUpdateAsync(http, launcher, manifest, gameDir, SetStatus, SetByteProgress);
+        var versionId = await LauncherRuntime.InstallOrUpdateAsync(http, launcher, activeManifest, gameDir, SetStatus, SetByteProgress);
         await MinecraftProfileConfigurator.ConfigureAsync(gameDir, settings, SetStatus);
 
         ProgressBar.IsIndeterminate = false;
@@ -445,7 +489,23 @@ public partial class MainWindow : Window
         var line = $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}";
         WriteUiLog(line);
         LogTextBox.AppendText(line);
+        TrimVisibleLog();
         LogTextBox.ScrollToEnd();
+    }
+
+    private void TrimVisibleLog()
+    {
+        if (LogTextBox.Text.Length <= MaxVisibleLogCharacters)
+            return;
+
+        var text = LogTextBox.Text;
+        var start = text.Length - MaxVisibleLogCharacters;
+        var nextLine = text.IndexOf(Environment.NewLine, start, StringComparison.Ordinal);
+        if (nextLine >= 0)
+            start = nextLine + Environment.NewLine.Length;
+
+        LogTextBox.Text = text[start..];
+        LogTextBox.CaretIndex = LogTextBox.Text.Length;
     }
 
     private static void WriteUiLog(string line)
@@ -453,6 +513,9 @@ public partial class MainWindow : Window
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(UiLogPath)!);
+            if (File.Exists(UiLogPath) && new FileInfo(UiLogPath).Length > MaxUiLogBytes)
+                File.WriteAllText(UiLogPath, "", Encoding.UTF8);
+
             File.AppendAllText(UiLogPath, line, Encoding.UTF8);
         }
         catch

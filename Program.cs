@@ -1,5 +1,6 @@
 using System.IO;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -31,7 +32,16 @@ internal static class LauncherRuntime
 
     public static HttpClient CreateHttpClient()
     {
-        var http = new HttpClient();
+        var handler = new SocketsHttpHandler
+        {
+            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10)
+        };
+
+        var http = new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromSeconds(25)
+        };
         http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("CobblemonLegacyLauncher", "1.0"));
         return http;
     }
@@ -399,6 +409,26 @@ internal sealed class ManagedFile
 
 internal static class ModpackManifestLoader
 {
+    public static string CachePath { get; } = Path.Combine(
+        Path.GetDirectoryName(LauncherSettings.SettingsPath)!,
+        "manifest-cache.json");
+
+    public static async Task<ModpackManifest?> TryLoadCachedAsync(JsonSerializerOptions jsonOptions)
+    {
+        try
+        {
+            if (!File.Exists(CachePath))
+                return null;
+
+            var json = await File.ReadAllTextAsync(CachePath, Encoding.UTF8);
+            return Normalize(Deserialize(json, jsonOptions));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public static async Task<ModpackManifest> LoadAsync(
         HttpClient http,
         string manifestLocation,
@@ -417,6 +447,7 @@ internal static class ModpackManifestLoader
             {
                 log?.Invoke("Baixando manifest do modpack...");
                 var json = await http.GetStringAsync(manifestLocation);
+                await SaveCacheAsync(json);
                 return Normalize(Deserialize(json, jsonOptions));
             }
             catch (Exception ex)
@@ -437,7 +468,9 @@ internal static class ModpackManifestLoader
             if (File.Exists(fallback))
             {
                 log?.Invoke($"Usando manifest local: {fallback}");
-                return Normalize(Deserialize(await File.ReadAllTextAsync(fallback, Encoding.UTF8), jsonOptions));
+                var json = await File.ReadAllTextAsync(fallback, Encoding.UTF8);
+                await SaveCacheAsync(json);
+                return Normalize(Deserialize(json, jsonOptions));
             }
         }
 
@@ -464,6 +497,19 @@ internal static class ModpackManifestLoader
     {
         return Uri.TryCreate(value, UriKind.Absolute, out var uri)
                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
+
+    private static async Task SaveCacheAsync(string json)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(CachePath)!);
+            await File.WriteAllTextAsync(CachePath, json, Encoding.UTF8);
+        }
+        catch
+        {
+            // Cache is an optimization only.
+        }
     }
 }
 
@@ -565,6 +611,7 @@ internal static class FabricProfileInstaller
 
 internal static class ManagedFileSynchronizer
 {
+    private const int MaxParallelDownloads = 4;
     private const string StateFileName = ".cobblemonlegacy-launcher-state.json";
 
     public static async Task SyncAsync(
@@ -577,24 +624,69 @@ internal static class ManagedFileSynchronizer
     {
         var statePath = Path.Combine(gameDir, StateFileName);
         var state = await LoadStateAsync(statePath, jsonOptions);
-        var expectedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var previousManagedFiles = new HashSet<string>(state.ManagedFiles, StringComparer.OrdinalIgnoreCase);
         var canTrustInstalledFiles = string.Equals(state.ManifestVersion, manifest.Version, StringComparison.OrdinalIgnoreCase);
+        var entries = manifest.Files
+            .Select(file => new ManagedFileEntry(NormalizeRelativePath(file.Path), file))
+            .ToArray();
+        var expectedPaths = new HashSet<string>(entries.Select(entry => entry.RelativePath), StringComparer.OrdinalIgnoreCase);
+        var semaphore = new SemaphoreSlim(MaxParallelDownloads);
+        var progressGate = new object();
+        var nextProgressLog = DateTime.MinValue;
+        var completed = 0;
+        var reused = 0;
+        var downloaded = 0;
+        var skipped = 0;
 
-        foreach (var file in manifest.Files)
+        await Task.WhenAll(entries.Select(async entry =>
         {
-            var relativePath = NormalizeRelativePath(file.Path);
-            expectedPaths.Add(relativePath);
-            await EnsureFileAsync(
-                http,
-                gameDir,
-                relativePath,
-                file,
-                canTrustInstalledFiles && previousManagedFiles.Contains(relativePath),
-                log,
-                byteProgress);
-        }
+            await semaphore.WaitAsync();
+            try
+            {
+                var result = await EnsureFileAsync(
+                    http,
+                    gameDir,
+                    entry.RelativePath,
+                    entry.File,
+                    canTrustInstalledFiles && previousManagedFiles.Contains(entry.RelativePath),
+                    log,
+                    entries.Length == 1 ? byteProgress : null);
 
+                switch (result)
+                {
+                    case ManagedFileSyncResult.Reused:
+                        Interlocked.Increment(ref reused);
+                        break;
+                    case ManagedFileSyncResult.Downloaded:
+                        Interlocked.Increment(ref downloaded);
+                        break;
+                    case ManagedFileSyncResult.Skipped:
+                        Interlocked.Increment(ref skipped);
+                        break;
+                }
+            }
+            finally
+            {
+                semaphore.Release();
+                var done = Interlocked.Increment(ref completed);
+                var now = DateTime.Now;
+                var shouldLog = done == entries.Length;
+
+                lock (progressGate)
+                {
+                    if (!shouldLog && now >= nextProgressLog)
+                    {
+                        shouldLog = true;
+                        nextProgressLog = now.AddSeconds(1);
+                    }
+                }
+
+                if (shouldLog)
+                    log?.Invoke($"Pack: {done}/{entries.Length} arquivos verificados...");
+            }
+        }));
+
+        var removed = 0;
         foreach (var previousPath in state.ManagedFiles.Where(path => !expectedPaths.Contains(path)).ToList())
         {
             var fullPath = ResolveGamePath(gameDir, previousPath);
@@ -602,6 +694,7 @@ internal static class ManagedFileSynchronizer
             {
                 File.Delete(fullPath);
                 log?.Invoke($"Removido arquivo antigo: {previousPath}");
+                removed++;
             }
         }
 
@@ -609,10 +702,10 @@ internal static class ManagedFileSynchronizer
         state.ManagedFiles = expectedPaths.Order(StringComparer.OrdinalIgnoreCase).ToList();
         await File.WriteAllTextAsync(statePath, JsonSerializer.Serialize(state, jsonOptions), Encoding.UTF8);
 
-        log?.Invoke($"{expectedPaths.Count} arquivo(s) do modpack sincronizado(s).");
+        log?.Invoke($"Pack sincronizado: {reused} mantidos, {downloaded} baixados, {removed} removidos, {skipped} ignorados.");
     }
 
-    private static async Task EnsureFileAsync(
+    private static async Task<ManagedFileSyncResult> EnsureFileAsync(
         HttpClient http,
         string gameDir,
         string relativePath,
@@ -625,16 +718,10 @@ internal static class ManagedFileSynchronizer
         Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
 
         if (File.Exists(targetPath) && FileCanBeTrusted(targetPath, file, trustExistingFile))
-        {
-            log?.Invoke($"OK: {relativePath}");
-            return;
-        }
+            return ManagedFileSyncResult.Reused;
 
         if (File.Exists(targetPath) && await FileMatchesAsync(targetPath, file))
-        {
-            log?.Invoke($"OK: {relativePath}");
-            return;
-        }
+            return ManagedFileSyncResult.Reused;
 
         if (string.IsNullOrWhiteSpace(file.Url))
         {
@@ -642,7 +729,7 @@ internal static class ManagedFileSynchronizer
                 throw new InvalidOperationException($"Arquivo obrigatorio sem URL no manifest: {relativePath}");
 
             log?.Invoke($"Ignorado sem URL: {relativePath}");
-            return;
+            return ManagedFileSyncResult.Skipped;
         }
 
         log?.Invoke($"Baixando: {relativePath}");
@@ -664,6 +751,7 @@ internal static class ManagedFileSynchronizer
 
             File.Move(tempPath, targetPath, true);
             log?.Invoke($"Instalado: {relativePath}");
+            return ManagedFileSyncResult.Downloaded;
         }
         finally
         {
@@ -761,6 +849,15 @@ internal static class ManagedFileSynchronizer
         var json = await File.ReadAllTextAsync(statePath, Encoding.UTF8);
         return JsonSerializer.Deserialize<LauncherState>(json, jsonOptions) ?? new LauncherState();
     }
+}
+
+internal sealed record ManagedFileEntry(string RelativePath, ManagedFile File);
+
+internal enum ManagedFileSyncResult
+{
+    Reused,
+    Downloaded,
+    Skipped
 }
 
 internal sealed class LauncherState
