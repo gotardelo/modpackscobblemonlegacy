@@ -14,7 +14,7 @@ public partial class App : Application
             return;
         }
 
-        var window = new MainWindow(e.Args);
+        var window = new MainWindow();
         MainWindow = window;
         window.Show();
     }

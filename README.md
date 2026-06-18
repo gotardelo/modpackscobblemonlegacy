@@ -6,12 +6,9 @@ Launcher/instalador em .NET/WPF para Minecraft 1.21.1 com Fabric e arquivos de m
 
 ```powershell
 .\run.ps1
-.\run.ps1 install
-.\run.ps1 play
-.\run.ps1 paths
 ```
 
-O launcher abre uma interface grafica do Cobblemon Legacy. Na primeira abertura ele pergunta se o jogador quer usar login Microsoft ou nickname offline.
+O launcher abre uma interface grafica do Cobblemon Legacy. O Minecraft so inicia depois que o jogador escolhe Microsoft ou nickname offline e clica no botao `JOGAR`.
 
 Servidor:
 

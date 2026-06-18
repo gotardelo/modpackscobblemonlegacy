@@ -19,18 +19,18 @@ public partial class MainWindow : Window
         Path.GetDirectoryName(LauncherSettings.SettingsPath)!,
         "launcher-ui.log");
 
-    private readonly string[] startupArgs;
     private readonly HttpClient http;
     private LauncherSettings? settings;
     private ModpackManifest? manifest;
     private bool isBusy;
+    private bool isClosing;
 
-    public MainWindow(string[] args)
+    public MainWindow()
     {
-        startupArgs = args;
         http = LauncherRuntime.CreateHttpClient();
         InitializeComponent();
         Loaded += MainWindow_Loaded;
+        Closing += (_, _) => isClosing = true;
         Closed += (_, _) => http.Dispose();
     }
 
@@ -48,9 +48,6 @@ public partial class MainWindow : Window
 
             SetStatus("Pronto para jogar.");
             SetBusy(false);
-
-            if (startupArgs.Any(arg => string.Equals(arg, "play", StringComparison.OrdinalIgnoreCase) || string.Equals(arg, "jogar", StringComparison.OrdinalIgnoreCase)))
-                await PlayAsync();
         }
         catch (Exception ex)
         {
@@ -153,8 +150,16 @@ public partial class MainWindow : Window
             ProgressBar.IsIndeterminate = true;
 
             await SaveOfflineNicknameIfNeededAsync();
+            if (isClosing)
+                return;
+
             var session = await ResolveSessionAsync();
+            if (isClosing)
+                return;
+
             var versionId = await UpdatePackCoreAsync(launchAfterUpdate: true);
+            if (isClosing)
+                return;
 
             var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
             var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
