@@ -1,6 +1,6 @@
 # Cobblemon Legacy Launcher
 
-Launcher/instalador em .NET para Minecraft 1.21.1 com Fabric e arquivos de modpack gerenciados por manifest.
+Launcher/instalador em .NET/WPF para Minecraft 1.21.1 com Fabric e arquivos de modpack gerenciados por manifest.
 
 ## Rodar localmente
 
@@ -9,6 +9,14 @@ Launcher/instalador em .NET para Minecraft 1.21.1 com Fabric e arquivos de modpa
 .\run.ps1 install
 .\run.ps1 play
 .\run.ps1 paths
+```
+
+O launcher abre uma interface grafica do Cobblemon Legacy. Na primeira abertura ele pergunta se o jogador quer usar login Microsoft ou nickname offline.
+
+Servidor:
+
+```txt
+enx-cirion-16.enx.host:10068
 ```
 
 O launcher cria a pasta do jogo em `%APPDATA%\.cobblemonlegacy` e a configuracao em `%APPDATA%\CobblemonLegacyLauncher\launcher.settings.json`.
@@ -48,6 +56,6 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 Para gerar instalador `.exe`, abra `installer\CobblemonLegacy.iss` no Inno Setup e compile. O instalador final sai em `dist\CobblemonLegacyLauncherSetup.exe`.
 
-## Observacao sobre login
+## Login
 
-Esta primeira versao usa sessao offline do `CmlLib.Core`. Ela instala Minecraft/Fabric e abre o jogo, mas servidores online-mode vao exigir login Microsoft. O proximo passo natural e adicionar autenticacao Microsoft ao launcher.
+O modo offline salva o nickname localmente. O modo Microsoft usa `CmlLib.Core.Auth.Microsoft` e abre o fluxo de autenticacao quando o jogador clica em Jogar.

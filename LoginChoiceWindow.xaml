@@ -1,0 +1,122 @@
+<Window x:Class="CobblemonLegacy.LoginChoiceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cobblemon Legacy - Login"
+        Width="620"
+        Height="420"
+        MinWidth="560"
+        MinHeight="380"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#0C1511">
+    <Grid>
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#0C1511" Offset="0" />
+                <GradientStop Color="#173524" Offset="0.55" />
+                <GradientStop Color="#261C12" Offset="1" />
+            </LinearGradientBrush>
+        </Grid.Background>
+
+        <Border Margin="24"
+                Padding="24"
+                CornerRadius="8"
+                Background="#D912211A"
+                BorderBrush="#35513D"
+                BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="COBBLEMON LEGACY"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontSize="28"
+                               FontWeight="Black" />
+                    <TextBlock Text="Escolha como voce quer entrar no launcher"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="15"
+                               Margin="0,6,0,0" />
+                </StackPanel>
+
+                <Grid Grid.Row="1" Margin="0,28,0,0">
+                    <Grid x:Name="ChoicePanel">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0"
+                                Height="108"
+                                Click="MicrosoftButton_Click">
+                            <StackPanel>
+                                <TextBlock Text="Entrar com Microsoft"
+                                           FontSize="17"
+                                           FontWeight="Bold"
+                                           TextAlignment="Center" />
+                                <TextBlock Text="Conta original do Minecraft"
+                                           FontSize="12"
+                                           Opacity="0.75"
+                                           TextAlignment="Center"
+                                           Margin="0,5,0,0" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="2"
+                                Height="108"
+                                Style="{StaticResource SecondaryButton}"
+                                Click="OfflineButton_Click">
+                            <StackPanel>
+                                <TextBlock Text="Usar nickname"
+                                           FontSize="17"
+                                           FontWeight="Bold"
+                                           TextAlignment="Center" />
+                                <TextBlock Text="Modo offline"
+                                           FontSize="12"
+                                           Opacity="0.75"
+                                           TextAlignment="Center"
+                                           Margin="0,5,0,0" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <StackPanel x:Name="NicknamePanel"
+                                Visibility="Collapsed"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="Digite seu nickname"
+                                   Foreground="{StaticResource InkBrush}"
+                                   FontSize="18"
+                                   FontWeight="Bold" />
+                        <TextBox x:Name="NicknameTextBox"
+                                 Margin="0,14,0,0"
+                                 MaxLength="16"
+                                 MinWidth="320" />
+                        <TextBlock x:Name="NicknameErrorText"
+                                   Foreground="{StaticResource CoralBrush}"
+                                   FontSize="12"
+                                   Margin="0,8,0,0" />
+                        <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+                            <Button Content="Salvar nickname"
+                                    MinWidth="150"
+                                    Click="SaveNicknameButton_Click" />
+                            <Button Content="Voltar"
+                                    Style="{StaticResource SecondaryButton}"
+                                    MinWidth="96"
+                                    Margin="10,0,0,0"
+                                    Click="BackButton_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Grid.Row="2"
+                           Text="Servidor: enx-cirion-16.enx.host:10068"
+                           Foreground="{StaticResource GoldBrush}"
+                           FontWeight="SemiBold" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

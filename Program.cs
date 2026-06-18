@@ -1,4 +1,5 @@
-using System.Diagnostics;
+using System.IO;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -7,199 +8,102 @@ using CmlLib.Core;
 using CmlLib.Core.Auth;
 using CmlLib.Core.ProcessBuilder;
 
-internal static class Program
+namespace CobblemonLegacy;
+
+internal static class LauncherRuntime
 {
-    private const string LauncherName = "Cobblemon Legacy";
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    public const string LauncherName = "Cobblemon Legacy";
+    public const string ServerIp = "enx-cirion-16.enx.host:10068";
+    public const string ServerHost = "Enxada Host";
+
+    public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true
     };
 
-    public static async Task<int> Main(string[] args)
+    public static HttpClient CreateHttpClient()
     {
-        Console.OutputEncoding = Encoding.UTF8;
-        Console.Title = LauncherName;
-
-        using var http = new HttpClient();
+        var http = new HttpClient();
         http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("CobblemonLegacyLauncher", "1.0"));
-
-        try
-        {
-            var settings = await LauncherSettings.LoadAsync(JsonOptions);
-            var command = ResolveCommand(args);
-
-            if (command == LauncherCommand.Menu)
-                command = ReadMenuChoice(settings);
-
-            if (command == LauncherCommand.Exit)
-                return 0;
-
-            var manifest = await ModpackManifestLoader.LoadAsync(http, settings.ManifestUrl, JsonOptions);
-            var gameDir = Path.GetFullPath(Environment.ExpandEnvironmentVariables(settings.GameDirectory));
-
-            PrintHeader(manifest, settings, gameDir);
-
-            if (command == LauncherCommand.Paths)
-            {
-                PrintPaths(settings, gameDir);
-                return 0;
-            }
-
-            var launcher = CreateMinecraftLauncher(gameDir);
-            var fabricVersionId = await InstallOrUpdateAsync(http, launcher, manifest, gameDir);
-
-            if (command == LauncherCommand.Install)
-            {
-                Console.WriteLine();
-                Console.WriteLine("Instalacao concluida. Use o comando 'play' para abrir o Minecraft.");
-                return 0;
-            }
-
-            await LaunchAsync(launcher, fabricVersionId, settings);
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine();
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("Falha no launcher:");
-            Console.ResetColor();
-            Console.WriteLine(ex.Message);
-            return 1;
-        }
+        return http;
     }
 
-    private static MinecraftLauncher CreateMinecraftLauncher(string gameDir)
+    public static MinecraftLauncher CreateMinecraftLauncher(
+        string gameDir,
+        Action<string>? log = null,
+        Action<long, long>? byteProgress = null)
     {
         var launcher = new MinecraftLauncher(new MinecraftPath(gameDir));
         launcher.FileProgressChanged += (_, args) =>
         {
             if (args.TotalTasks <= 0)
             {
-                Console.WriteLine($"Minecraft: {args.Name}");
+                log?.Invoke($"Minecraft: {args.Name}");
                 return;
             }
 
-            Console.WriteLine($"Minecraft: {args.ProgressedTasks}/{args.TotalTasks} - {args.Name}");
+            log?.Invoke($"Minecraft: {args.ProgressedTasks}/{args.TotalTasks} - {args.Name}");
         };
         launcher.ByteProgressChanged += (_, args) =>
         {
             if (args.TotalBytes > 0)
-                Console.Write($"\rDownload: {FormatBytes(args.ProgressedBytes)} / {FormatBytes(args.TotalBytes)}   ");
+                byteProgress?.Invoke(args.ProgressedBytes, args.TotalBytes);
         };
         return launcher;
     }
 
-    private static async Task<string> InstallOrUpdateAsync(HttpClient http, MinecraftLauncher launcher, ModpackManifest manifest, string gameDir)
+    public static async Task<string> InstallOrUpdateAsync(
+        HttpClient http,
+        MinecraftLauncher launcher,
+        ModpackManifest manifest,
+        string gameDir,
+        Action<string>? log = null,
+        Action<long, long>? byteProgress = null)
     {
         Directory.CreateDirectory(gameDir);
         Directory.CreateDirectory(Path.Combine(gameDir, "mods"));
         Directory.CreateDirectory(Path.Combine(gameDir, "resourcepacks"));
         Directory.CreateDirectory(Path.Combine(gameDir, "config"));
 
-        Console.WriteLine();
-        Console.WriteLine($"Instalando Minecraft {manifest.MinecraftVersion}...");
+        log?.Invoke($"Instalando Minecraft {manifest.MinecraftVersion}...");
         await launcher.InstallAsync(manifest.MinecraftVersion);
 
-        Console.WriteLine();
-        Console.WriteLine("Preparando Fabric...");
-        var fabricVersionId = await FabricProfileInstaller.InstallAsync(http, gameDir, manifest.MinecraftVersion, manifest.FabricLoaderVersion);
+        log?.Invoke("Preparando Fabric...");
+        var fabricVersionId = await FabricProfileInstaller.InstallAsync(http, gameDir, manifest.MinecraftVersion, manifest.FabricLoaderVersion, log);
 
-        Console.WriteLine($"Instalando bibliotecas da versao {fabricVersionId}...");
+        log?.Invoke($"Instalando bibliotecas da versao {fabricVersionId}...");
         await launcher.InstallAsync(fabricVersionId);
 
-        Console.WriteLine();
-        Console.WriteLine("Sincronizando mods/resourcepacks/config...");
-        await ManagedFileSynchronizer.SyncAsync(http, gameDir, manifest, JsonOptions);
+        log?.Invoke("Sincronizando mods, resourcepacks e configs...");
+        await ManagedFileSynchronizer.SyncAsync(http, gameDir, manifest, JsonOptions, log, byteProgress);
 
         return fabricVersionId;
     }
 
-    private static async Task LaunchAsync(MinecraftLauncher launcher, string versionId, LauncherSettings settings)
+    public static async Task<System.Diagnostics.Process> StartGameAsync(
+        MinecraftLauncher launcher,
+        string versionId,
+        LauncherSettings settings,
+        MSession session)
     {
-        Console.WriteLine();
-        Console.WriteLine($"Abrindo {LauncherName} ({versionId})...");
-
         var process = await launcher.BuildProcessAsync(versionId, new MLaunchOption
         {
-            Session = MSession.CreateOfflineSession(settings.OfflineUsername),
+            Session = session,
             MaximumRamMb = settings.MaximumRamMb
         });
 
         process.Start();
-        Console.WriteLine($"Minecraft iniciado como '{settings.OfflineUsername}' (PID {process.Id}).");
-        Console.WriteLine("Se a janela nao aparecer na frente, confira o Alt+Tab ou a barra de tarefas.");
-
-        await Task.Delay(TimeSpan.FromSeconds(10));
-        if (process.HasExited)
-        {
-            Console.WriteLine($"Minecraft fechou rapidamente com codigo {process.ExitCode}.");
-            Console.WriteLine("Veja os logs em %APPDATA%\\.cobblemonlegacy\\logs.");
-        }
-        else
-        {
-            Console.WriteLine("Minecraft continua em execucao. Se ficar travado, aumente a RAM ou veja latest.log/crash-reports.");
-        }
+        return process;
     }
 
-    private static LauncherCommand ResolveCommand(string[] args)
+    public static string ExpandGameDirectory(LauncherSettings settings)
     {
-        if (args.Length == 0)
-            return LauncherCommand.Menu;
-
-        return args[0].Trim().ToLowerInvariant() switch
-        {
-            "play" or "jogar" or "launch" => LauncherCommand.Play,
-            "install" or "instalar" or "update" or "atualizar" => LauncherCommand.Install,
-            "paths" or "pastas" => LauncherCommand.Paths,
-            "exit" or "sair" => LauncherCommand.Exit,
-            _ => LauncherCommand.Menu
-        };
+        return Path.GetFullPath(Environment.ExpandEnvironmentVariables(settings.GameDirectory));
     }
 
-    private static LauncherCommand ReadMenuChoice(LauncherSettings settings)
-    {
-        Console.WriteLine($"{LauncherName} Launcher");
-        Console.WriteLine();
-        Console.WriteLine("1 - Instalar/atualizar e jogar");
-        Console.WriteLine("2 - Apenas instalar/atualizar");
-        Console.WriteLine("3 - Mostrar pastas/configuracao");
-        Console.WriteLine("0 - Sair");
-        Console.WriteLine();
-        Console.Write($"Escolha uma opcao [1] - jogador: {settings.OfflineUsername}: ");
-
-        return Console.ReadLine()?.Trim() switch
-        {
-            "0" => LauncherCommand.Exit,
-            "2" => LauncherCommand.Install,
-            "3" => LauncherCommand.Paths,
-            _ => LauncherCommand.Play
-        };
-    }
-
-    private static void PrintHeader(ModpackManifest manifest, LauncherSettings settings, string gameDir)
-    {
-        Console.WriteLine();
-        Console.WriteLine($"{manifest.Name} v{manifest.Version}");
-        Console.WriteLine($"Minecraft: {manifest.MinecraftVersion}");
-        Console.WriteLine($"Fabric: {manifest.FabricLoaderVersion}");
-        Console.WriteLine($"RAM maxima: {settings.MaximumRamMb} MB");
-        Console.WriteLine($"Pasta do jogo: {gameDir}");
-    }
-
-    private static void PrintPaths(LauncherSettings settings, string gameDir)
-    {
-        Console.WriteLine();
-        Console.WriteLine($"Configuracao: {LauncherSettings.SettingsPath}");
-        Console.WriteLine($"Manifest remoto: {settings.ManifestUrl}");
-        Console.WriteLine($"Pasta do jogo: {gameDir}");
-        Console.WriteLine($"Mods: {Path.Combine(gameDir, "mods")}");
-        Console.WriteLine($"Resourcepacks: {Path.Combine(gameDir, "resourcepacks")}");
-    }
-
-    private static string FormatBytes(long bytes)
+    public static string FormatBytes(long bytes)
     {
         string[] units = ["B", "KB", "MB", "GB"];
         var size = (double)bytes;
@@ -215,13 +119,10 @@ internal static class Program
     }
 }
 
-internal enum LauncherCommand
+internal static class AuthModes
 {
-    Menu,
-    Play,
-    Install,
-    Paths,
-    Exit
+    public const string Microsoft = "microsoft";
+    public const string Offline = "offline";
 }
 
 internal sealed class LauncherSettings
@@ -236,6 +137,8 @@ internal sealed class LauncherSettings
     public string ManifestUrl { get; set; } = ProgramDefaults.ManifestUrl;
     public string GameDirectory { get; set; } = "%APPDATA%\\.cobblemonlegacy";
     public string OfflineUsername { get; set; } = "Player";
+    public string AuthMode { get; set; } = "";
+    public string MicrosoftUsername { get; set; } = "";
     public int MaximumRamMb { get; set; } = RecommendedRamMb;
 
     public static async Task<LauncherSettings> LoadAsync(JsonSerializerOptions jsonOptions)
@@ -243,8 +146,7 @@ internal sealed class LauncherSettings
         if (!File.Exists(SettingsPath))
         {
             var settings = new LauncherSettings();
-            Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-            await File.WriteAllTextAsync(SettingsPath, JsonSerializer.Serialize(settings, jsonOptions), Encoding.UTF8);
+            await settings.SaveAsync(jsonOptions);
             return settings;
         }
 
@@ -261,11 +163,35 @@ internal sealed class LauncherSettings
         loaded.OfflineUsername = string.IsNullOrWhiteSpace(loaded.OfflineUsername) ? "Player" : loaded.OfflineUsername.Trim();
         loaded.ManifestUrl = string.IsNullOrWhiteSpace(loaded.ManifestUrl) ? ProgramDefaults.ManifestUrl : loaded.ManifestUrl.Trim();
         loaded.GameDirectory = string.IsNullOrWhiteSpace(loaded.GameDirectory) ? "%APPDATA%\\.cobblemonlegacy" : loaded.GameDirectory.Trim();
+        loaded.AuthMode = NormalizeAuthMode(loaded.AuthMode);
+        loaded.MicrosoftUsername = loaded.MicrosoftUsername?.Trim() ?? "";
 
         if (normalized)
-            await File.WriteAllTextAsync(SettingsPath, JsonSerializer.Serialize(loaded, jsonOptions), Encoding.UTF8);
+            await loaded.SaveAsync(jsonOptions);
 
         return loaded;
+    }
+
+    public async Task SaveAsync(JsonSerializerOptions jsonOptions)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        AuthMode = NormalizeAuthMode(AuthMode);
+        OfflineUsername = string.IsNullOrWhiteSpace(OfflineUsername) ? "Player" : OfflineUsername.Trim();
+        ManifestUrl = string.IsNullOrWhiteSpace(ManifestUrl) ? ProgramDefaults.ManifestUrl : ManifestUrl.Trim();
+        GameDirectory = string.IsNullOrWhiteSpace(GameDirectory) ? "%APPDATA%\\.cobblemonlegacy" : GameDirectory.Trim();
+        MaximumRamMb = Math.Max(1024, MaximumRamMb);
+
+        await File.WriteAllTextAsync(SettingsPath, JsonSerializer.Serialize(this, jsonOptions), Encoding.UTF8);
+    }
+
+    private static string NormalizeAuthMode(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            AuthModes.Microsoft => AuthModes.Microsoft,
+            AuthModes.Offline => AuthModes.Offline,
+            _ => ""
+        };
     }
 }
 
@@ -295,7 +221,11 @@ internal sealed class ManagedFile
 
 internal static class ModpackManifestLoader
 {
-    public static async Task<ModpackManifest> LoadAsync(HttpClient http, string manifestLocation, JsonSerializerOptions jsonOptions)
+    public static async Task<ModpackManifest> LoadAsync(
+        HttpClient http,
+        string manifestLocation,
+        JsonSerializerOptions jsonOptions,
+        Action<string>? log = null)
     {
         var localFallbacks = new[]
         {
@@ -307,14 +237,14 @@ internal static class ModpackManifestLoader
         {
             try
             {
-                Console.WriteLine($"Baixando manifest: {manifestLocation}");
+                log?.Invoke("Baixando manifest do modpack...");
                 var json = await http.GetStringAsync(manifestLocation);
                 return Normalize(Deserialize(json, jsonOptions));
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Nao foi possivel baixar o manifest remoto: {ex.Message}");
-                Console.WriteLine("Tentando manifest local...");
+                log?.Invoke($"Nao foi possivel baixar o manifest remoto: {ex.Message}");
+                log?.Invoke("Tentando manifest local...");
             }
         }
         else if (!string.IsNullOrWhiteSpace(manifestLocation))
@@ -328,12 +258,12 @@ internal static class ModpackManifestLoader
         {
             if (File.Exists(fallback))
             {
-                Console.WriteLine($"Usando manifest local: {fallback}");
+                log?.Invoke($"Usando manifest local: {fallback}");
                 return Normalize(Deserialize(await File.ReadAllTextAsync(fallback, Encoding.UTF8), jsonOptions));
             }
         }
 
-        throw new InvalidOperationException("Nenhum manifest encontrado. Ajuste launcher.settings.json ou coloque manifest.json ao lado do projeto/executavel.");
+        throw new InvalidOperationException("Nenhum manifest encontrado. Ajuste launcher.settings.json ou coloque manifest.json ao lado do executavel.");
     }
 
     private static ModpackManifest Deserialize(string json, JsonSerializerOptions jsonOptions)
@@ -361,9 +291,14 @@ internal static class ModpackManifestLoader
 
 internal static class FabricProfileInstaller
 {
-    public static async Task<string> InstallAsync(HttpClient http, string gameDir, string minecraftVersion, string loaderVersion)
+    public static async Task<string> InstallAsync(
+        HttpClient http,
+        string gameDir,
+        string minecraftVersion,
+        string loaderVersion,
+        Action<string>? log = null)
     {
-        var resolvedLoaderVersion = await ResolveLoaderVersionAsync(http, gameDir, minecraftVersion, loaderVersion);
+        var resolvedLoaderVersion = await ResolveLoaderVersionAsync(http, gameDir, minecraftVersion, loaderVersion, log);
         var expectedVersionId = $"fabric-loader-{resolvedLoaderVersion}-{minecraftVersion}";
         var expectedJsonPath = Path.Combine(gameDir, "versions", expectedVersionId, $"{expectedVersionId}.json");
 
@@ -377,17 +312,22 @@ internal static class FabricProfileInstaller
 
             Directory.CreateDirectory(versionDir);
             await File.WriteAllTextAsync(Path.Combine(versionDir, $"{versionId}.json"), json, Encoding.UTF8);
-            Console.WriteLine($"Fabric {resolvedLoaderVersion} instalado como {versionId}.");
+            log?.Invoke($"Fabric {resolvedLoaderVersion} instalado.");
             return versionId;
         }
         catch (Exception ex) when (File.Exists(expectedJsonPath))
         {
-            Console.WriteLine($"Nao foi possivel atualizar o perfil Fabric ({ex.Message}). Usando perfil local.");
+            log?.Invoke($"Nao foi possivel atualizar o perfil Fabric ({ex.Message}). Usando perfil local.");
             return expectedVersionId;
         }
     }
 
-    private static async Task<string> ResolveLoaderVersionAsync(HttpClient http, string gameDir, string minecraftVersion, string loaderVersion)
+    private static async Task<string> ResolveLoaderVersionAsync(
+        HttpClient http,
+        string gameDir,
+        string minecraftVersion,
+        string loaderVersion,
+        Action<string>? log = null)
     {
         if (!string.Equals(loaderVersion, "latest", StringComparison.OrdinalIgnoreCase))
             return loaderVersion;
@@ -414,7 +354,7 @@ internal static class FabricProfileInstaller
             var installed = FindInstalledFabricVersion(gameDir, minecraftVersion);
             if (installed is not null)
             {
-                Console.WriteLine($"Nao foi possivel consultar Fabric latest ({ex.Message}). Usando {installed.LoaderVersion} local.");
+                log?.Invoke($"Nao foi possivel consultar Fabric latest ({ex.Message}). Usando {installed.LoaderVersion} local.");
                 return installed.LoaderVersion;
             }
 
@@ -449,7 +389,13 @@ internal static class ManagedFileSynchronizer
 {
     private const string StateFileName = ".cobblemonlegacy-launcher-state.json";
 
-    public static async Task SyncAsync(HttpClient http, string gameDir, ModpackManifest manifest, JsonSerializerOptions jsonOptions)
+    public static async Task SyncAsync(
+        HttpClient http,
+        string gameDir,
+        ModpackManifest manifest,
+        JsonSerializerOptions jsonOptions,
+        Action<string>? log = null,
+        Action<long, long>? byteProgress = null)
     {
         var statePath = Path.Combine(gameDir, StateFileName);
         var state = await LoadStateAsync(statePath, jsonOptions);
@@ -459,7 +405,7 @@ internal static class ManagedFileSynchronizer
         {
             var relativePath = NormalizeRelativePath(file.Path);
             expectedPaths.Add(relativePath);
-            await EnsureFileAsync(http, gameDir, relativePath, file);
+            await EnsureFileAsync(http, gameDir, relativePath, file, log, byteProgress);
         }
 
         foreach (var previousPath in state.ManagedFiles.Where(path => !expectedPaths.Contains(path)).ToList())
@@ -468,7 +414,7 @@ internal static class ManagedFileSynchronizer
             if (File.Exists(fullPath))
             {
                 File.Delete(fullPath);
-                Console.WriteLine($"Removido arquivo antigo: {previousPath}");
+                log?.Invoke($"Removido arquivo antigo: {previousPath}");
             }
         }
 
@@ -476,17 +422,23 @@ internal static class ManagedFileSynchronizer
         state.ManagedFiles = expectedPaths.Order(StringComparer.OrdinalIgnoreCase).ToList();
         await File.WriteAllTextAsync(statePath, JsonSerializer.Serialize(state, jsonOptions), Encoding.UTF8);
 
-        Console.WriteLine($"{expectedPaths.Count} arquivo(s) gerenciado(s) sincronizado(s).");
+        log?.Invoke($"{expectedPaths.Count} arquivo(s) do modpack sincronizado(s).");
     }
 
-    private static async Task EnsureFileAsync(HttpClient http, string gameDir, string relativePath, ManagedFile file)
+    private static async Task EnsureFileAsync(
+        HttpClient http,
+        string gameDir,
+        string relativePath,
+        ManagedFile file,
+        Action<string>? log,
+        Action<long, long>? byteProgress)
     {
         var targetPath = ResolveGamePath(gameDir, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
 
         if (File.Exists(targetPath) && await FileMatchesAsync(targetPath, file))
         {
-            Console.WriteLine($"OK: {relativePath}");
+            log?.Invoke($"OK: {relativePath}");
             return;
         }
 
@@ -495,11 +447,11 @@ internal static class ManagedFileSynchronizer
             if (file.Required)
                 throw new InvalidOperationException($"Arquivo obrigatorio sem URL no manifest: {relativePath}");
 
-            Console.WriteLine($"Ignorado sem URL: {relativePath}");
+            log?.Invoke($"Ignorado sem URL: {relativePath}");
             return;
         }
 
-        Console.WriteLine($"Baixando: {relativePath}");
+        log?.Invoke($"Baixando: {relativePath}");
         var tempPath = $"{targetPath}.download";
 
         try
@@ -510,14 +462,14 @@ internal static class ManagedFileSynchronizer
             await using (var source = await response.Content.ReadAsStreamAsync())
             await using (var destination = File.Create(tempPath))
             {
-                await CopyWithProgressAsync(source, destination, response.Content.Headers.ContentLength ?? file.Size, relativePath);
+                await CopyWithProgressAsync(source, destination, response.Content.Headers.ContentLength ?? file.Size, byteProgress);
             }
 
             if (!await FileMatchesAsync(tempPath, file))
                 throw new InvalidOperationException($"Hash/tamanho invalido para {relativePath}. Confira o manifest.");
 
             File.Move(tempPath, targetPath, true);
-            Console.WriteLine($"Instalado: {relativePath}");
+            log?.Invoke($"Instalado: {relativePath}");
         }
         finally
         {
@@ -549,7 +501,7 @@ internal static class ManagedFileSynchronizer
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    private static async Task CopyWithProgressAsync(Stream source, Stream destination, long? totalBytes, string relativePath)
+    private static async Task CopyWithProgressAsync(Stream source, Stream destination, long? totalBytes, Action<long, long>? byteProgress)
     {
         var buffer = new byte[1024 * 128];
         long copied = 0;
@@ -564,16 +516,8 @@ internal static class ManagedFileSynchronizer
             copied += read;
 
             if (totalBytes is > 0)
-                Console.Write($"\r{relativePath}: {FormatPercent(copied, totalBytes.Value)}   ");
+                byteProgress?.Invoke(copied, totalBytes.Value);
         }
-
-        if (totalBytes is > 0)
-            Console.WriteLine();
-    }
-
-    private static string FormatPercent(long current, long total)
-    {
-        return $"{current * 100d / total:0.0}%";
     }
 
     private static string NormalizeRelativePath(string value)
