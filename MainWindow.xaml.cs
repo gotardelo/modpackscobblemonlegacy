@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private LauncherSettings? settings;
     private ModpackManifest? manifest;
     private MSession? microsoftSession;
+    private LauncherPrimaryAction primaryAction = LauncherPrimaryAction.Hidden;
     private bool isBusy;
     private bool isClosing;
 
@@ -55,7 +56,7 @@ public partial class MainWindow : Window
             await EnsureAuthChoiceAsync();
             ApplySettingsToUi();
 
-            SetStatus(HasPlayableProfile() ? "Pronto para jogar." : "Escolha uma conta para liberar o JOGAR.");
+            SetStatus(HasPlayableProfile() ? "Verificando pack..." : "Escolha uma conta para liberar o JOGAR.");
             SetBusy(false);
 
             await LoadCachedManifestAsync();
@@ -111,6 +112,7 @@ public partial class MainWindow : Window
 
         manifest = cachedManifest;
         ApplyManifestToUi(cachedManifest);
+        await RefreshPrimaryActionAsync();
         AppendLog("Manifest em cache carregado.");
     }
 
@@ -127,10 +129,16 @@ public partial class MainWindow : Window
 
             manifest = loadedManifest;
             Dispatcher.Invoke(() => ApplyManifestToUi(loadedManifest));
+            await RefreshPrimaryActionAsync();
         }
         catch (Exception ex)
         {
             AppendLog($"Manifest remoto indisponivel: {ex.Message}");
+            if (manifest is null)
+            {
+                SetPrimaryAction(HasPlayableProfile() ? LauncherPrimaryAction.NeedsUpdate : LauncherPrimaryAction.Hidden);
+                SetStatus("Nao foi possivel carregar o manifest. Tente novamente em instantes.");
+            }
         }
     }
 
@@ -165,7 +173,7 @@ public partial class MainWindow : Window
 
         NicknameTextBox.Text = settings.OfflineUsername;
         ShowNicknameEditor(false);
-        ShowPlayButton(HasPlayableProfile());
+        SetPrimaryAction(HasPlayableProfile() ? LauncherPrimaryAction.Checking : LauncherPrimaryAction.Hidden);
         RamText.Text = $"RAM: {settings.MaximumRamMb} MB";
         UpdateAccountText();
     }
@@ -199,21 +207,46 @@ public partial class MainWindow : Window
         };
     }
 
-    private async void PlayButton_Click(object sender, RoutedEventArgs e)
+    private async Task RefreshPrimaryActionAsync()
     {
-        await PlayAsync();
-    }
+        if (!HasPlayableProfile())
+        {
+            SetPrimaryAction(LauncherPrimaryAction.Hidden);
+            return;
+        }
 
-    private async void UpdateButton_Click(object sender, RoutedEventArgs e)
-    {
+        if (settings is null || manifest is null)
+        {
+            SetPrimaryAction(LauncherPrimaryAction.Checking);
+            return;
+        }
+
         try
         {
-            await UpdatePackAsync(launchAfterUpdate: false);
+            SetPrimaryAction(LauncherPrimaryAction.Checking);
+            var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
+            var readiness = await LauncherRuntime.CheckPackReadinessAsync(gameDir, manifest, LauncherRuntime.JsonOptions);
+            SetPrimaryAction(readiness.IsReady ? LauncherPrimaryAction.Ready : LauncherPrimaryAction.NeedsUpdate);
+            SetStatus(readiness.Message);
         }
         catch (Exception ex)
         {
-            SetBusy(false);
-            ShowError(ex.Message);
+            AppendLog($"Nao foi possivel verificar o pack: {ex.Message}");
+            SetPrimaryAction(LauncherPrimaryAction.NeedsUpdate);
+            SetStatus("Nao foi possivel verificar o pack. Clique em ATUALIZAR.");
+        }
+    }
+
+    private async void PlayButton_Click(object sender, RoutedEventArgs e)
+    {
+        switch (primaryAction)
+        {
+            case LauncherPrimaryAction.NeedsUpdate:
+                await UpdatePackOnlyAsync();
+                break;
+            case LauncherPrimaryAction.Ready:
+                await PlayAsync();
+                break;
         }
     }
 
@@ -225,6 +258,7 @@ public partial class MainWindow : Window
         try
         {
             SetBusy(true);
+            SetPrimaryAction(LauncherPrimaryAction.Updating);
             ProgressBar.IsIndeterminate = true;
 
             await SaveOfflineNicknameIfNeededAsync();
@@ -242,17 +276,21 @@ public partial class MainWindow : Window
             var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
             var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
 
+            SetPrimaryAction(LauncherPrimaryAction.Launching);
             SetStatus("Abrindo Minecraft...");
             var process = await LauncherRuntime.StartGameAsync(launcher, versionId, settings, session, AppendLog);
             AppendLog($"Minecraft iniciado com PID {process.Id}.");
             SetStatus("Minecraft aberto. A primeira carga pode levar alguns minutos.");
+            SetPrimaryAction(LauncherPrimaryAction.Ready);
         }
         catch (Exception ex) when (IsMicrosoftAuthCancellation(ex))
         {
+            SetPrimaryAction(HasPlayableProfile() ? LauncherPrimaryAction.Ready : LauncherPrimaryAction.Hidden);
             SetStatus("Login Microsoft cancelado.");
         }
         catch (Exception ex)
         {
+            _ = RefreshPrimaryActionAsync();
             ShowError(ex.Message);
         }
         finally
@@ -261,20 +299,25 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<string?> UpdatePackAsync(bool launchAfterUpdate)
+    private async Task UpdatePackOnlyAsync()
     {
-        if (settings is null)
-            return null;
-
-        if (isBusy)
-            return null;
+        if (isBusy || settings is null)
+            return;
 
         try
         {
             SetBusy(true);
+            SetPrimaryAction(LauncherPrimaryAction.Updating);
             ProgressBar.IsIndeterminate = true;
             await SaveOfflineNicknameIfNeededAsync();
-            return await UpdatePackCoreAsync(launchAfterUpdate);
+            await UpdatePackCoreAsync(launchAfterUpdate: false);
+            SetPrimaryAction(LauncherPrimaryAction.Ready);
+            SetStatus("Pack atualizado. Clique em JOGAR.");
+        }
+        catch (Exception ex)
+        {
+            _ = RefreshPrimaryActionAsync();
+            ShowError(ex.Message);
         }
         finally
         {
@@ -338,7 +381,8 @@ public partial class MainWindow : Window
         microsoftSession = null;
         await settings.SaveAsync(LauncherRuntime.JsonOptions);
         UpdateAccountText();
-        ShowPlayButton(HasPlayableProfile());
+        if (!isBusy)
+            await RefreshPrimaryActionAsync();
     }
 
     private async void SaveNicknameButton_Click(object sender, RoutedEventArgs e)
@@ -373,17 +417,18 @@ public partial class MainWindow : Window
             ProgressBar.IsIndeterminate = true;
             ShowNicknameEditor(false);
             await SignInWithMicrosoftAsync();
-            ShowPlayButton(true);
+            await RefreshPrimaryActionAsync();
             SetStatus($"Conta Microsoft conectada: {settings.MicrosoftUsername}. Pode clicar em JOGAR.");
         }
         catch (Exception ex) when (IsMicrosoftAuthCancellation(ex))
         {
-            ShowPlayButton(HasPlayableProfile());
+            SetPrimaryAction(HasPlayableProfile() ? LauncherPrimaryAction.Checking : LauncherPrimaryAction.Hidden);
+            _ = RefreshPrimaryActionAsync();
             SetStatus("Login Microsoft cancelado.");
         }
         catch (Exception ex)
         {
-            ShowPlayButton(HasPlayableProfile());
+            _ = RefreshPrimaryActionAsync();
             ShowError(ex.Message);
         }
         finally
@@ -401,7 +446,7 @@ public partial class MainWindow : Window
 
             NicknameTextBox.Text = settings.OfflineUsername;
             ShowNicknameEditor(true);
-            ShowPlayButton(false);
+            SetPrimaryAction(LauncherPrimaryAction.Hidden);
             SetStatus("Digite seu nickname e clique em Salvar.");
         }
         catch (Exception ex)
@@ -434,7 +479,9 @@ public partial class MainWindow : Window
         await settings.SaveAsync(LauncherRuntime.JsonOptions);
 
         UpdateAccountText();
-        ShowPlayButton(HasPlayableProfile());
+        if (!isBusy)
+            await RefreshPrimaryActionAsync();
+
         return session;
     }
 
@@ -534,9 +581,32 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowPlayButton(bool visible)
+    private void SetPrimaryAction(LauncherPrimaryAction action)
     {
-        PlayButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => SetPrimaryAction(action));
+            return;
+        }
+
+        primaryAction = action;
+        PlayButton.Content = action switch
+        {
+            LauncherPrimaryAction.Checking => "VERIFICANDO...",
+            LauncherPrimaryAction.NeedsUpdate => "ATUALIZAR",
+            LauncherPrimaryAction.Ready => "JOGAR",
+            LauncherPrimaryAction.Updating => "ATUALIZANDO...",
+            LauncherPrimaryAction.Launching => "ABRINDO...",
+            _ => "JOGAR"
+        };
+
+        PlayButton.Visibility = action == LauncherPrimaryAction.Hidden ? Visibility.Collapsed : Visibility.Visible;
+        PlayButton.IsEnabled = !isBusy && IsPrimaryActionClickable(action);
+    }
+
+    private static bool IsPrimaryActionClickable(LauncherPrimaryAction action)
+    {
+        return action is LauncherPrimaryAction.NeedsUpdate or LauncherPrimaryAction.Ready;
     }
 
     private static bool IsFromInteractiveControl(DependencyObject? source)
@@ -555,8 +625,7 @@ public partial class MainWindow : Window
     private void SetBusy(bool value)
     {
         isBusy = value;
-        PlayButton.IsEnabled = !value;
-        UpdateButton.IsEnabled = !value;
+        PlayButton.IsEnabled = !value && IsPrimaryActionClickable(primaryAction);
         ProgressBar.IsIndeterminate = value;
         ProgressPercentText.Text = value ? "..." : $"{ProgressBar.Value:0}%";
     }
@@ -632,4 +701,14 @@ public partial class MainWindow : Window
         SetStatus($"Erro: {message}");
         MessageBox.Show(this, message, "Cobblemon Legacy", MessageBoxButton.OK, MessageBoxImage.Error);
     }
+}
+
+internal enum LauncherPrimaryAction
+{
+    Hidden,
+    Checking,
+    NeedsUpdate,
+    Ready,
+    Updating,
+    Launching
 }

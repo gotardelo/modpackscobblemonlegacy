@@ -8,7 +8,7 @@ Launcher/instalador em .NET/WPF para Minecraft 1.21.1 com Fabric e arquivos de m
 .\run.ps1
 ```
 
-O launcher abre uma interface grafica do Cobblemon Legacy. O Minecraft so inicia depois que o jogador escolhe Microsoft ou nickname offline e clica no botao `JOGAR`.
+O launcher abre uma interface grafica do Cobblemon Legacy. Depois que o jogador escolhe Microsoft ou nickname offline, o botao principal mostra `ATUALIZAR` quando falta algo no pack e `JOGAR` quando esta pronto.
 
 Servidor:
 
@@ -18,7 +18,7 @@ enx-cirion-16.enx.host:10068
 
 O launcher cria a pasta do jogo em `%APPDATA%\.cobblemonlegacy` e a configuracao em `%APPDATA%\CobblemonLegacyLauncher\launcher.settings.json`.
 
-Ao jogar/atualizar, o launcher tambem:
+Ao atualizar/jogar, o launcher tambem:
 
 - adiciona o Cobblemon Legacy automaticamente na lista de servidores do Multiplayer;
 - aplica uma vez um preset inicial de performance mais leve em `options.txt`.

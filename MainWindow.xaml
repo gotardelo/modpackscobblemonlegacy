@@ -339,20 +339,13 @@
                             </Grid>
 
                             <Button x:Name="PlayButton"
-                                    Content="JOGAR"
-                                    Height="52"
-                                    Margin="0,12,0,0"
-                                    FontSize="19"
-                                    FontWeight="Black"
-                                    Visibility="Collapsed"
-                                    Click="PlayButton_Click" />
-
-                            <Button x:Name="UpdateButton"
-                                    Content="Atualizar pack"
-                                    Style="{StaticResource SecondaryButton}"
-                                    Height="36"
-                                    Margin="0,8,0,0"
-                                    Click="UpdateButton_Click" />
+                                     Content="JOGAR"
+                                     Height="52"
+                                     Margin="0,12,0,0"
+                                     FontSize="19"
+                                     FontWeight="Black"
+                                     Visibility="Collapsed"
+                                     Click="PlayButton_Click" />
 
                             <Grid Margin="0,10,0,0">
                                 <ProgressBar x:Name="ProgressBar"

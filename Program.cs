@@ -118,6 +118,23 @@ internal static class LauncherRuntime
         return fabricVersionId;
     }
 
+    public static async Task<PackReadiness> CheckPackReadinessAsync(
+        string gameDir,
+        ModpackManifest manifest,
+        JsonSerializerOptions jsonOptions)
+    {
+        if (!IsVersionInstalled(gameDir, manifest.MinecraftVersion))
+            return new PackReadiness(false, $"Minecraft {manifest.MinecraftVersion} precisa ser instalado.");
+
+        if (!FabricProfileInstaller.IsInstalled(gameDir, manifest.MinecraftVersion, manifest.FabricLoaderVersion))
+            return new PackReadiness(false, "Fabric precisa ser instalado.");
+
+        if (!await ManagedFileSynchronizer.IsSynchronizedAsync(gameDir, manifest, jsonOptions))
+            return new PackReadiness(false, "Pack precisa ser atualizado.");
+
+        return new PackReadiness(true, "Pronto para jogar.");
+    }
+
     private static bool IsVersionInstalled(string gameDir, string versionId)
     {
         return File.Exists(Path.Combine(gameDir, "versions", versionId, $"{versionId}.json"));
@@ -389,6 +406,8 @@ internal static class ProgramDefaults
     public const string FabricMetaBaseUrl = "https://meta.fabricmc.net/v2";
 }
 
+internal sealed record PackReadiness(bool IsReady, string Message);
+
 internal sealed class ModpackManifest
 {
     public string Name { get; set; } = "Cobblemon Legacy";
@@ -515,6 +534,15 @@ internal static class ModpackManifestLoader
 
 internal static class FabricProfileInstaller
 {
+    public static bool IsInstalled(string gameDir, string minecraftVersion, string loaderVersion)
+    {
+        if (string.Equals(loaderVersion, "latest", StringComparison.OrdinalIgnoreCase))
+            return FindInstalledFabricVersion(gameDir, minecraftVersion) is not null;
+
+        var versionId = $"fabric-loader-{loaderVersion}-{minecraftVersion}";
+        return File.Exists(Path.Combine(gameDir, "versions", versionId, $"{versionId}.json"));
+    }
+
     public static async Task<string> InstallAsync(
         HttpClient http,
         string gameDir,
@@ -613,6 +641,38 @@ internal static class ManagedFileSynchronizer
 {
     private const int MaxParallelDownloads = 4;
     private const string StateFileName = ".cobblemonlegacy-launcher-state.json";
+
+    public static async Task<bool> IsSynchronizedAsync(
+        string gameDir,
+        ModpackManifest manifest,
+        JsonSerializerOptions jsonOptions)
+    {
+        var statePath = Path.Combine(gameDir, StateFileName);
+        var state = await LoadStateAsync(statePath, jsonOptions);
+        if (!string.Equals(state.ManifestVersion, manifest.Version, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var entries = manifest.Files
+            .Select(file => new ManagedFileEntry(NormalizeRelativePath(file.Path), file))
+            .ToArray();
+        var expectedPaths = new HashSet<string>(entries.Select(entry => entry.RelativePath), StringComparer.OrdinalIgnoreCase);
+        var managedPaths = new HashSet<string>(state.ManagedFiles, StringComparer.OrdinalIgnoreCase);
+
+        if (managedPaths.Count != expectedPaths.Count || !expectedPaths.SetEquals(managedPaths))
+            return false;
+
+        foreach (var entry in entries)
+        {
+            var fullPath = ResolveGamePath(gameDir, entry.RelativePath);
+            if (!File.Exists(fullPath))
+                return false;
+
+            if (entry.File.Size is not null && new FileInfo(fullPath).Length != entry.File.Size.Value)
+                return false;
+        }
+
+        return true;
+    }
 
     public static async Task SyncAsync(
         HttpClient http,
