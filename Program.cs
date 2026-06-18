@@ -140,6 +140,7 @@ internal sealed class LauncherSettings
     public string AuthMode { get; set; } = "";
     public string MicrosoftUsername { get; set; } = "";
     public int MaximumRamMb { get; set; } = RecommendedRamMb;
+    public int PerformancePresetVersion { get; set; }
 
     public static async Task<LauncherSettings> LoadAsync(JsonSerializerOptions jsonOptions)
     {
