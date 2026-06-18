@@ -146,9 +146,11 @@
                                        FontSize="13"
                                        FontWeight="SemiBold"
                                        TextAlignment="Center"
-                                       Margin="0,6,0,20" />
+                                       Margin="0,6,0,20"
+                                       Visibility="Collapsed" />
 
                             <Button Style="{StaticResource LoginOptionButton}"
+                                    Margin="0,24,0,0"
                                     Click="MicrosoftModeButton_Click">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -211,7 +213,9 @@
                                 </Grid>
                             </Button>
 
-                            <Grid Margin="0,14,0,0">
+                            <Grid x:Name="NicknameEditorPanel"
+                                  Margin="0,14,0,0"
+                                  Visibility="Collapsed">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="10" />

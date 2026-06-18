@@ -1,9 +1,11 @@
 using System.IO;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CmlLib.Core;
 using CmlLib.Core.Auth;
 using CmlLib.Core.ProcessBuilder;
@@ -15,6 +17,10 @@ internal static class LauncherRuntime
     public const string LauncherName = "Cobblemon Legacy";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
+    private const int StaleGameProcessSeconds = 30;
+    private static readonly Regex SensitiveLaunchArgumentRegex = new(
+        @"(--(?:accessToken|uuid|xuid|clientId)\s+)(""[^""]*""|\S+)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -36,8 +42,14 @@ internal static class LauncherRuntime
         Action<long, long>? byteProgress = null)
     {
         var launcher = new MinecraftLauncher(new MinecraftPath(gameDir));
+        var lastFileProgressLog = DateTime.MinValue;
         launcher.FileProgressChanged += (_, args) =>
         {
+            var now = DateTime.Now;
+            if ((now - lastFileProgressLog).TotalMilliseconds < 750 && args.ProgressedTasks != args.TotalTasks)
+                return;
+
+            lastFileProgressLog = now;
             if (args.TotalTasks <= 0)
             {
                 log?.Invoke($"Minecraft: {args.Name}");
@@ -67,14 +79,28 @@ internal static class LauncherRuntime
         Directory.CreateDirectory(Path.Combine(gameDir, "resourcepacks"));
         Directory.CreateDirectory(Path.Combine(gameDir, "config"));
 
-        log?.Invoke($"Instalando Minecraft {manifest.MinecraftVersion}...");
-        await launcher.InstallAsync(manifest.MinecraftVersion);
+        if (IsVersionInstalled(gameDir, manifest.MinecraftVersion))
+        {
+            log?.Invoke($"Minecraft {manifest.MinecraftVersion} ja instalado.");
+        }
+        else
+        {
+            log?.Invoke($"Instalando Minecraft {manifest.MinecraftVersion}...");
+            await launcher.InstallAsync(manifest.MinecraftVersion);
+        }
 
         log?.Invoke("Preparando Fabric...");
         var fabricVersionId = await FabricProfileInstaller.InstallAsync(http, gameDir, manifest.MinecraftVersion, manifest.FabricLoaderVersion, log);
 
-        log?.Invoke($"Instalando bibliotecas da versao {fabricVersionId}...");
-        await launcher.InstallAsync(fabricVersionId);
+        if (IsVersionInstalled(gameDir, fabricVersionId))
+        {
+            log?.Invoke($"Fabric {fabricVersionId} ja instalado.");
+        }
+        else
+        {
+            log?.Invoke($"Instalando bibliotecas da versao {fabricVersionId}...");
+            await launcher.InstallAsync(fabricVersionId);
+        }
 
         log?.Invoke("Sincronizando mods, resourcepacks e configs...");
         await ManagedFileSynchronizer.SyncAsync(http, gameDir, manifest, JsonOptions, log, byteProgress);
@@ -82,20 +108,171 @@ internal static class LauncherRuntime
         return fabricVersionId;
     }
 
+    private static bool IsVersionInstalled(string gameDir, string versionId)
+    {
+        return File.Exists(Path.Combine(gameDir, "versions", versionId, $"{versionId}.json"));
+    }
+
     public static async Task<System.Diagnostics.Process> StartGameAsync(
         MinecraftLauncher launcher,
         string versionId,
         LauncherSettings settings,
-        MSession session)
+        MSession session,
+        Action<string>? log = null)
     {
+        var gameDir = ExpandGameDirectory(settings);
+        var stoppedProcesses = StopStaleGameProcesses(gameDir, log);
+        if (stoppedProcesses > 0)
+            await Task.Delay(750);
+
         var process = await launcher.BuildProcessAsync(versionId, new MLaunchOption
         {
             Session = session,
-            MaximumRamMb = settings.MaximumRamMb
+            MaximumRamMb = settings.MaximumRamMb,
+            MinimumRamMb = Math.Min(1024, settings.MaximumRamMb),
+            GameLauncherName = "CobblemonLegacy",
+            GameLauncherVersion = "1.0"
         });
 
-        process.Start();
+        ConfigureMinecraftProcess(process, log);
+        await WriteLaunchDiagnosticsAsync(process.StartInfo);
+
+        if (!process.Start())
+            throw new InvalidOperationException("O processo do Minecraft nao iniciou.");
+
+        BeginMinecraftOutputRead(process, log);
+        process.EnableRaisingEvents = true;
+        process.Exited += (_, _) =>
+        {
+            try
+            {
+                var message = process.ExitCode == 0
+                    ? "Minecraft fechado."
+                    : $"Minecraft fechou com codigo {process.ExitCode}. Confira o latest.log.";
+                log?.Invoke(message);
+            }
+            catch
+            {
+                // Ignore diagnostics failures after the game process exits.
+            }
+        };
+
         return process;
+    }
+
+    private static void ConfigureMinecraftProcess(System.Diagnostics.Process process, Action<string>? log)
+    {
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = false;
+        process.StartInfo.WindowStyle = ProcessWindowStyle.Normal;
+        process.StartInfo.RedirectStandardOutput = false;
+        process.StartInfo.RedirectStandardError = false;
+
+        log?.Invoke($"Java: {Path.GetFileName(process.StartInfo.FileName)}");
+    }
+
+    private static void BeginMinecraftOutputRead(System.Diagnostics.Process process, Action<string>? log)
+    {
+        if (!process.StartInfo.RedirectStandardOutput && !process.StartInfo.RedirectStandardError)
+            return;
+
+        process.OutputDataReceived += (_, args) =>
+        {
+            if (!string.IsNullOrWhiteSpace(args.Data))
+                log?.Invoke($"Minecraft: {args.Data}");
+        };
+
+        process.ErrorDataReceived += (_, args) =>
+        {
+            if (!string.IsNullOrWhiteSpace(args.Data))
+                log?.Invoke($"Minecraft: {args.Data}");
+        };
+
+        try
+        {
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
+        catch (InvalidOperationException)
+        {
+            log?.Invoke("Nao foi possivel acompanhar a saida do Minecraft.");
+        }
+    }
+
+    private static int StopStaleGameProcesses(string gameDir, Action<string>? log)
+    {
+        var stopped = 0;
+        var runtimeDir = Path.Combine(Path.GetFullPath(gameDir), "runtime");
+
+        foreach (var processName in new[] { "java", "javaw" })
+        {
+            foreach (var process in System.Diagnostics.Process.GetProcessesByName(processName))
+            {
+                using (process)
+                {
+                    try
+                    {
+                        var executable = process.MainModule?.FileName;
+                        if (string.IsNullOrWhiteSpace(executable) || !IsInsideDirectory(executable, runtimeDir))
+                            continue;
+
+                        if (process.MainWindowHandle != IntPtr.Zero)
+                            continue;
+
+                        var age = DateTime.Now - process.StartTime;
+                        if (age.TotalSeconds < StaleGameProcessSeconds)
+                            continue;
+
+                        log?.Invoke($"Fechando Minecraft antigo sem janela (PID {process.Id}).");
+                        process.Kill(entireProcessTree: true);
+                        process.WaitForExit(5000);
+                        stopped++;
+                    }
+                    catch (Exception ex)
+                    {
+                        log?.Invoke($"Nao foi possivel verificar processo {process.Id}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        return stopped;
+    }
+
+    private static bool IsInsideDirectory(string path, string directory)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var fullDirectory = Path.GetFullPath(directory);
+        var directoryWithSeparator = fullDirectory.EndsWith(Path.DirectorySeparatorChar)
+            ? fullDirectory
+            : $"{fullDirectory}{Path.DirectorySeparatorChar}";
+
+        return fullPath.StartsWith(directoryWithSeparator, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task WriteLaunchDiagnosticsAsync(ProcessStartInfo startInfo)
+    {
+        var diagnosticsDir = Path.GetDirectoryName(LauncherSettings.SettingsPath)!;
+        Directory.CreateDirectory(diagnosticsDir);
+
+        var logPath = Path.Combine(diagnosticsDir, "launcher.log");
+        var commandPath = Path.Combine(diagnosticsDir, "last-launch-command.txt");
+        var sanitizedArguments = SanitizeLaunchArguments(startInfo.Arguments);
+
+        var entry = new StringBuilder()
+            .AppendLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Starting Minecraft")
+            .AppendLine($"FileName: {startInfo.FileName}")
+            .AppendLine($"WorkingDirectory: {startInfo.WorkingDirectory}")
+            .AppendLine($"ArgumentsLength: {startInfo.Arguments.Length}")
+            .AppendLine();
+
+        await File.AppendAllTextAsync(logPath, entry.ToString(), Encoding.UTF8);
+        await File.WriteAllTextAsync(commandPath, $"{startInfo.FileName} {sanitizedArguments}", Encoding.UTF8);
+    }
+
+    private static string SanitizeLaunchArguments(string arguments)
+    {
+        return SensitiveLaunchArgumentRegex.Replace(arguments, "$1<hidden>");
     }
 
     public static string ExpandGameDirectory(LauncherSettings settings)
@@ -401,12 +578,21 @@ internal static class ManagedFileSynchronizer
         var statePath = Path.Combine(gameDir, StateFileName);
         var state = await LoadStateAsync(statePath, jsonOptions);
         var expectedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var previousManagedFiles = new HashSet<string>(state.ManagedFiles, StringComparer.OrdinalIgnoreCase);
+        var canTrustInstalledFiles = string.Equals(state.ManifestVersion, manifest.Version, StringComparison.OrdinalIgnoreCase);
 
         foreach (var file in manifest.Files)
         {
             var relativePath = NormalizeRelativePath(file.Path);
             expectedPaths.Add(relativePath);
-            await EnsureFileAsync(http, gameDir, relativePath, file, log, byteProgress);
+            await EnsureFileAsync(
+                http,
+                gameDir,
+                relativePath,
+                file,
+                canTrustInstalledFiles && previousManagedFiles.Contains(relativePath),
+                log,
+                byteProgress);
         }
 
         foreach (var previousPath in state.ManagedFiles.Where(path => !expectedPaths.Contains(path)).ToList())
@@ -431,11 +617,18 @@ internal static class ManagedFileSynchronizer
         string gameDir,
         string relativePath,
         ManagedFile file,
+        bool trustExistingFile,
         Action<string>? log,
         Action<long, long>? byteProgress)
     {
         var targetPath = ResolveGamePath(gameDir, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+
+        if (File.Exists(targetPath) && FileCanBeTrusted(targetPath, file, trustExistingFile))
+        {
+            log?.Invoke($"OK: {relativePath}");
+            return;
+        }
 
         if (File.Exists(targetPath) && await FileMatchesAsync(targetPath, file))
         {
@@ -493,6 +686,18 @@ internal static class ManagedFileSynchronizer
 
         var hash = await ComputeSha256Async(path);
         return string.Equals(hash, file.Sha256.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool FileCanBeTrusted(string path, ManagedFile file, bool trustExistingFile)
+    {
+        if (!trustExistingFile)
+            return false;
+
+        if (file.Size is null)
+            return true;
+
+        var info = new FileInfo(path);
+        return info.Length == file.Size.Value;
     }
 
     private static async Task<string> ComputeSha256Async(string path)

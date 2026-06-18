@@ -1,4 +1,6 @@
+using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,6 +15,9 @@ namespace CobblemonLegacy;
 public partial class MainWindow : Window
 {
     private static readonly Regex NicknameRegex = new("^[A-Za-z0-9_]{3,16}$", RegexOptions.Compiled);
+    private static readonly string UiLogPath = Path.Combine(
+        Path.GetDirectoryName(LauncherSettings.SettingsPath)!,
+        "launcher-ui.log");
 
     private readonly string[] startupArgs;
     private readonly HttpClient http;
@@ -99,6 +104,7 @@ public partial class MainWindow : Window
             return;
 
         NicknameTextBox.Text = settings.OfflineUsername;
+        ShowNicknameEditor(false);
         RamText.Text = $"RAM: {settings.MaximumRamMb} MB";
         UpdateAccountText();
     }
@@ -137,18 +143,23 @@ public partial class MainWindow : Window
 
     private async Task PlayAsync()
     {
+        if (isBusy || settings is null)
+            return;
+
         try
         {
-            var versionId = await UpdatePackAsync(launchAfterUpdate: true);
-            if (versionId is null || settings is null)
-                return;
+            SetBusy(true);
+            ProgressBar.IsIndeterminate = true;
 
+            await SaveOfflineNicknameIfNeededAsync();
             var session = await ResolveSessionAsync();
+            var versionId = await UpdatePackCoreAsync(launchAfterUpdate: true);
+
             var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
             var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
 
             SetStatus("Abrindo Minecraft...");
-            var process = await LauncherRuntime.StartGameAsync(launcher, versionId, settings, session);
+            var process = await LauncherRuntime.StartGameAsync(launcher, versionId, settings, session, AppendLog);
             AppendLog($"Minecraft iniciado com PID {process.Id}.");
             SetStatus("Minecraft aberto. A primeira carga pode levar alguns minutos.");
         }
@@ -170,10 +181,23 @@ public partial class MainWindow : Window
         if (isBusy)
             return null;
 
-        SetBusy(true);
-        ProgressBar.IsIndeterminate = true;
+        try
+        {
+            SetBusy(true);
+            ProgressBar.IsIndeterminate = true;
+            await SaveOfflineNicknameIfNeededAsync();
+            return await UpdatePackCoreAsync(launchAfterUpdate);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
 
-        await SaveOfflineNicknameIfNeededAsync();
+    private async Task<string> UpdatePackCoreAsync(bool launchAfterUpdate)
+    {
+        if (settings is null)
+            throw new InvalidOperationException("Configuracao nao carregada.");
 
         manifest ??= await ModpackManifestLoader.LoadAsync(http, settings.ManifestUrl, LauncherRuntime.JsonOptions, AppendLog);
 
@@ -187,9 +211,6 @@ public partial class MainWindow : Window
         ProgressBar.Value = 100;
         SetStatus(launchAfterUpdate ? "Pack atualizado. Preparando jogo..." : "Pack atualizado.");
 
-        if (!launchAfterUpdate)
-            SetBusy(false);
-
         return versionId;
     }
 
@@ -200,6 +221,7 @@ public partial class MainWindow : Window
 
         if (settings.AuthMode == AuthModes.Microsoft)
         {
+            ShowNicknameEditor(false);
             SetStatus("Abrindo login Microsoft...");
             AppendLog("Login Microsoft iniciado.");
             var loginHandler = JELoginHandlerBuilder.BuildDefault();
@@ -211,7 +233,10 @@ public partial class MainWindow : Window
         }
 
         if (!NicknameRegex.IsMatch(settings.OfflineUsername))
+        {
+            ShowNicknameEditor(true);
             throw new InvalidOperationException("Defina um nickname valido antes de jogar.");
+        }
 
         return MSession.CreateOfflineSession(settings.OfflineUsername);
     }
@@ -239,6 +264,7 @@ public partial class MainWindow : Window
 
             settings.AuthMode = AuthModes.Offline;
             await SaveOfflineNicknameIfNeededAsync();
+            ShowNicknameEditor(false);
             SetStatus("Nickname salvo.");
         }
         catch (Exception ex)
@@ -256,6 +282,7 @@ public partial class MainWindow : Window
 
             settings.AuthMode = AuthModes.Microsoft;
             await settings.SaveAsync(LauncherRuntime.JsonOptions);
+            ShowNicknameEditor(false);
             UpdateAccountText();
             SetStatus("Microsoft selecionado. O login abre quando voce clicar em Jogar.");
         }
@@ -273,8 +300,10 @@ public partial class MainWindow : Window
                 return;
 
             settings.AuthMode = AuthModes.Offline;
-            await SaveOfflineNicknameIfNeededAsync();
-            SetStatus("Modo nickname selecionado.");
+            await settings.SaveAsync(LauncherRuntime.JsonOptions);
+            UpdateAccountText();
+            ShowNicknameEditor(true);
+            SetStatus("Digite seu nickname e clique em Salvar ou Jogar.");
         }
         catch (Exception ex)
         {
@@ -305,6 +334,17 @@ public partial class MainWindow : Window
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void ShowNicknameEditor(bool visible)
+    {
+        NicknameEditorPanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+
+        if (visible)
+        {
+            NicknameTextBox.Focus();
+            NicknameTextBox.SelectAll();
+        }
     }
 
     private static bool IsFromInteractiveControl(DependencyObject? source)
@@ -354,8 +394,23 @@ public partial class MainWindow : Window
             return;
         }
 
-        LogTextBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
+        var line = $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}";
+        WriteUiLog(line);
+        LogTextBox.AppendText(line);
         LogTextBox.ScrollToEnd();
+    }
+
+    private static void WriteUiLog(string line)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(UiLogPath)!);
+            File.AppendAllText(UiLogPath, line, Encoding.UTF8);
+        }
+        catch
+        {
+            // File logging is diagnostic only; the launcher UI should keep working.
+        }
     }
 
     private void ShowError(string message)
