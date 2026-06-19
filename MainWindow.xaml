@@ -37,6 +37,17 @@
             <Setter Property="BorderBrush" Value="#00000000" />
         </Style>
 
+        <Style x:Key="TopOptionsButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Width" Value="86" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Black" />
+            <Setter Property="Foreground" Value="#EAFBFF" />
+            <Setter Property="Background" Value="#7A071520" />
+            <Setter Property="BorderBrush" Value="#6AD9F6" />
+        </Style>
+
         <Style x:Key="LoginOptionButton" TargetType="Button">
             <Setter Property="Height" Value="50" />
             <Setter Property="Padding" Value="18,0" />
@@ -381,6 +392,10 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"
                             Margin="0,6,8,0">
+                    <Button Content="Opcoes"
+                            Style="{StaticResource TopOptionsButton}"
+                            Margin="0,0,8,0"
+                            Click="OptionsButton_Click" />
                     <Button Content="–"
                             Style="{StaticResource ChromeButton}"
                             Click="MinimizeButton_Click" />
@@ -700,20 +715,24 @@
                                         VerticalAlignment="Center">
                                 <Button Content="Opcoes"
                                         Width="78"
+                                        MinWidth="0"
                                         Style="{StaticResource FooterLinkButton}"
                                         Click="OptionsButton_Click" />
                                 <Button Content="Relatorio"
                                         Width="78"
+                                        MinWidth="0"
                                         Style="{StaticResource FooterLinkButton}"
                                         Margin="8,0,0,0"
                                         Click="CrashReportButton_Click" />
                                 <Button Content="Discord"
                                         Width="78"
+                                        MinWidth="0"
                                         Style="{StaticResource FooterLinkButton}"
                                         Margin="8,0,0,0"
                                         Click="DiscordButton_Click" />
                                 <Button Content="Site"
                                         Width="78"
+                                        MinWidth="0"
                                         Style="{StaticResource FooterLinkButton}"
                                         Margin="8,0,0,0"
                                         Click="WebsiteButton_Click" />
