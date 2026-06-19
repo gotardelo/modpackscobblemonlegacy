@@ -7,7 +7,7 @@ namespace CobblemonLegacy;
 
 internal static class MinecraftProfileConfigurator
 {
-    private const int CurrentPerformancePresetVersion = 1;
+    private const int CurrentPerformancePresetVersion = 2;
 
     public static async Task ConfigureAsync(
         string gameDir,
@@ -85,16 +85,20 @@ internal static class MinecraftProfileConfigurator
                 order.Add(key);
         }
 
+        var tier = LauncherRuntime.GetPerformanceTier();
+        var preset = PerformancePreset.ForTier(tier);
+
         SetOption(map, order, "graphicsMode", "0");
-        SetOption(map, order, "renderDistance", "8");
-        SetOption(map, order, "simulationDistance", "6");
-        SetOption(map, order, "mipmapLevels", "2");
-        SetOption(map, order, "particles", "1");
+        SetOption(map, order, "renderDistance", preset.RenderDistance.ToString());
+        SetOption(map, order, "simulationDistance", preset.SimulationDistance.ToString());
+        SetOption(map, order, "mipmapLevels", preset.MipmapLevels.ToString());
+        SetOption(map, order, "particles", preset.Particles.ToString());
         SetOption(map, order, "renderClouds", "\"false\"");
         SetOption(map, order, "entityShadows", "false");
-        SetOption(map, order, "entityDistanceScaling", "0.75");
-        SetOption(map, order, "biomeBlendRadius", "1");
-        SetOption(map, order, "maxFps", "90");
+        SetOption(map, order, "entityDistanceScaling", preset.EntityDistanceScaling);
+        SetOption(map, order, "biomeBlendRadius", preset.BiomeBlendRadius.ToString());
+        SetOption(map, order, "maxFps", preset.MaxFps.ToString());
+        SetOption(map, order, "enableVsync", "true");
         SetOption(map, order, "menuBackgroundBlurriness", "0");
         SetOption(map, order, "lastServer", LauncherRuntime.ServerIp);
 
@@ -103,7 +107,7 @@ internal static class MinecraftProfileConfigurator
 
         settings.PerformancePresetVersion = CurrentPerformancePresetVersion;
         await settings.SaveAsync(LauncherRuntime.JsonOptions);
-        log?.Invoke("Preset inicial de performance aplicado.");
+        log?.Invoke($"Preset de performance aplicado: {preset.Name}.");
     }
 
     private static void SetOption(Dictionary<string, string> map, List<string> order, string key, string value)
@@ -111,6 +115,27 @@ internal static class MinecraftProfileConfigurator
         map[key] = value;
         if (!order.Contains(key, StringComparer.OrdinalIgnoreCase))
             order.Add(key);
+    }
+
+    private sealed record PerformancePreset(
+        string Name,
+        int RenderDistance,
+        int SimulationDistance,
+        int MipmapLevels,
+        int Particles,
+        string EntityDistanceScaling,
+        int BiomeBlendRadius,
+        int MaxFps)
+    {
+        public static PerformancePreset ForTier(PerformanceTier tier)
+        {
+            return tier switch
+            {
+                PerformanceTier.LowEnd => new PerformancePreset("leve", 5, 4, 0, 2, "0.5", 0, 45),
+                PerformanceTier.Balanced => new PerformancePreset("equilibrado", 6, 4, 1, 1, "0.65", 0, 60),
+                _ => new PerformancePreset("padrao", 8, 5, 2, 1, "0.75", 1, 90)
+            };
+        }
     }
 }
 

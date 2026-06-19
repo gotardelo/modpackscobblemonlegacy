@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.0.6";
+    public const string LauncherVersion = "1.0.7";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -167,6 +167,7 @@ internal static class LauncherRuntime
             Session = session,
             MaximumRamMb = maximumRamMb,
             MinimumRamMb = Math.Min(1024, maximumRamMb),
+            ExtraJvmArguments = BuildPerformanceJvmArguments(),
             GameLauncherName = "CobblemonLegacy",
             GameLauncherVersion = LauncherVersion
         });
@@ -261,18 +262,12 @@ internal static class LauncherRuntime
 
     private static int ResolveMaximumRamMb(int requestedRamMb, Action<string>? log = null)
     {
-        requestedRamMb = Math.Max(2_048, requestedRamMb);
+        requestedRamMb = Math.Clamp(requestedRamMb, 2_048, 8_192);
         var memory = TryGetPhysicalMemoryMb();
         if (memory is null)
             return requestedRamMb;
 
-        var recommendedRamMb = memory.TotalMb switch
-        {
-            >= 16_384 => 8_192,
-            >= 12_288 => 6_144,
-            >= 8_192 => 4_096,
-            _ => 3_072
-        };
+        var recommendedRamMb = GetRecommendedMaximumRamMb(memory.TotalMb);
         var safeAvailableRamMb = Math.Max(2_048, memory.AvailableMb - 1_024);
         var resolvedRamMb = Math.Clamp(
             Math.Min(requestedRamMb, Math.Min(recommendedRamMb, safeAvailableRamMb)),
@@ -291,6 +286,61 @@ internal static class LauncherRuntime
         }
 
         return resolvedRamMb;
+    }
+
+    public static int GetRecommendedMaximumRamMb()
+    {
+        var memory = TryGetPhysicalMemoryMb();
+        return memory is null ? 4_096 : GetRecommendedMaximumRamMb(memory.TotalMb);
+    }
+
+    public static PerformanceTier GetPerformanceTier()
+    {
+        var memory = TryGetPhysicalMemoryMb();
+        if (memory is null)
+            return PerformanceTier.Standard;
+
+        if (memory.TotalMb < 9_000)
+            return PerformanceTier.LowEnd;
+
+        if (memory.TotalMb < 13_000)
+            return PerformanceTier.Balanced;
+
+        return PerformanceTier.Standard;
+    }
+
+    public static int GetRecommendedParallelDownloads()
+    {
+        return GetPerformanceTier() switch
+        {
+            PerformanceTier.LowEnd => 2,
+            PerformanceTier.Balanced => 3,
+            _ => 4
+        };
+    }
+
+    private static int GetRecommendedMaximumRamMb(int totalMemoryMb)
+    {
+        return totalMemoryMb switch
+        {
+            >= 24_576 => 8_192,
+            >= 16_384 => 6_144,
+            >= 12_288 => 5_120,
+            >= 8_192 => 3_072,
+            _ => 2_048
+        };
+    }
+
+    private static MArgument[] BuildPerformanceJvmArguments()
+    {
+        var arguments = new List<MArgument>
+        {
+            new("-XX:+DisableExplicitGC"),
+            new("-Dsun.rmi.dgc.server.gcInterval=2147483646"),
+            new("-Dsun.rmi.dgc.client.gcInterval=2147483646")
+        };
+
+        return arguments.ToArray();
     }
 
     private static PhysicalMemoryInfo? TryGetPhysicalMemoryMb()
@@ -617,6 +667,13 @@ internal static class LauncherRuntime
 
 internal sealed record CrashReportResult(string Path, string Text);
 
+internal enum PerformanceTier
+{
+    LowEnd,
+    Balanced,
+    Standard
+}
+
 internal static class AuthModes
 {
     public const string Microsoft = "microsoft";
@@ -625,7 +682,7 @@ internal static class AuthModes
 
 internal sealed class LauncherSettings
 {
-    private const int RecommendedRamMb = 8192;
+    private const int LegacyRecommendedRamMb = 8192;
 
     public static string SettingsPath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -637,7 +694,7 @@ internal sealed class LauncherSettings
     public string OfflineUsername { get; set; } = "Player";
     public string AuthMode { get; set; } = "";
     public string MicrosoftUsername { get; set; } = "";
-    public int MaximumRamMb { get; set; } = RecommendedRamMb;
+    public int MaximumRamMb { get; set; } = LauncherRuntime.GetRecommendedMaximumRamMb();
     public int PerformancePresetVersion { get; set; }
 
     public static async Task<LauncherSettings> LoadAsync(JsonSerializerOptions jsonOptions)
@@ -653,9 +710,16 @@ internal sealed class LauncherSettings
         var loaded = JsonSerializer.Deserialize<LauncherSettings>(json, jsonOptions) ?? new LauncherSettings();
         var normalized = false;
 
-        if (loaded.MaximumRamMb < RecommendedRamMb)
+        var recommendedRamMb = LauncherRuntime.GetRecommendedMaximumRamMb();
+        if (loaded.MaximumRamMb <= 0)
         {
-            loaded.MaximumRamMb = RecommendedRamMb;
+            loaded.MaximumRamMb = recommendedRamMb;
+            normalized = true;
+        }
+
+        if (loaded.MaximumRamMb == LegacyRecommendedRamMb && recommendedRamMb < LegacyRecommendedRamMb)
+        {
+            loaded.MaximumRamMb = recommendedRamMb;
             normalized = true;
         }
 
@@ -687,7 +751,7 @@ internal sealed class LauncherSettings
             ManifestUrl = ProgramDefaults.ManifestUrl;
 
         GameDirectory = string.IsNullOrWhiteSpace(GameDirectory) ? "%APPDATA%\\.cobblemonlegacy" : GameDirectory.Trim();
-        MaximumRamMb = Math.Max(1024, MaximumRamMb);
+        MaximumRamMb = Math.Clamp(MaximumRamMb, 2048, 8192);
 
         await File.WriteAllTextAsync(SettingsPath, JsonSerializer.Serialize(this, jsonOptions), Encoding.UTF8);
     }
@@ -1174,7 +1238,6 @@ internal static class FabricProfileInstaller
 
 internal static class ManagedFileSynchronizer
 {
-    private const int MaxParallelDownloads = 4;
     private const string StateFileName = ".cobblemonlegacy-launcher-state.json";
 
     public static async Task<bool> IsSynchronizedAsync(
@@ -1225,13 +1288,15 @@ internal static class ManagedFileSynchronizer
             .Select(file => new ManagedFileEntry(NormalizeRelativePath(file.Path), file))
             .ToArray();
         var expectedPaths = new HashSet<string>(entries.Select(entry => entry.RelativePath), StringComparer.OrdinalIgnoreCase);
-        var semaphore = new SemaphoreSlim(MaxParallelDownloads);
+        var parallelDownloads = LauncherRuntime.GetRecommendedParallelDownloads();
+        var semaphore = new SemaphoreSlim(parallelDownloads);
         var progressGate = new object();
         var nextProgressLog = DateTime.MinValue;
         var completed = 0;
         var reused = 0;
         var downloaded = 0;
         var skipped = 0;
+        log?.Invoke($"Verificando pack com {parallelDownloads} download(s) paralelo(s).");
 
         await Task.WhenAll(entries.Select(async entry =>
         {

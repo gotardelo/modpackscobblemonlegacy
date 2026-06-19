@@ -21,7 +21,9 @@ O launcher cria a pasta do jogo em `%APPDATA%\.cobblemonlegacy` e a configuracao
 Ao atualizar/jogar, o launcher tambem:
 
 - adiciona o Cobblemon Legacy automaticamente na lista de servidores do Multiplayer;
-- aplica uma vez um preset inicial de performance mais leve em `options.txt`.
+- aplica um preset inicial/adaptativo de performance mais leve em `options.txt`;
+- ajusta RAM e downloads paralelos conforme o PC do jogador;
+- valida e repara bibliotecas do Fabric antes de iniciar o jogo.
 
 ## Manifest do modpack
 
@@ -53,7 +55,7 @@ Suba os arquivos dentro de `pack/mods`, `pack/resourcepacks`, `pack/config` e `p
 ## Publicar o launcher
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o publish\win-x64
+dotnet publish -c Release -r win-x64 -o publish\win-x64
 ```
 
 Para gerar instalador `.exe`, abra `installer\CobblemonLegacy.iss` no Inno Setup e compile. O instalador final sai em `dist\CobblemonLegacyLauncherSetup.exe`.
