@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -17,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.0.4";
+    public const string LauncherVersion = "1.0.5";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -104,15 +105,17 @@ internal static class LauncherRuntime
         log?.Invoke("Preparando Fabric...");
         var fabricVersionId = await FabricProfileInstaller.InstallAsync(http, gameDir, manifest.MinecraftVersion, manifest.FabricLoaderVersion, log);
 
-        if (IsVersionInstalled(gameDir, fabricVersionId))
+        if (IsVersionInstalled(gameDir, fabricVersionId) && await FabricProfileInstaller.HasRequiredLibrariesAsync(gameDir, fabricVersionId, log))
         {
-            log?.Invoke($"Fabric {fabricVersionId} ja instalado.");
+            log?.Invoke($"Fabric {fabricVersionId} ja instalado e validado.");
         }
         else
         {
             log?.Invoke($"Instalando bibliotecas da versao {fabricVersionId}...");
             await launcher.InstallAsync(fabricVersionId);
         }
+
+        await FabricProfileInstaller.RepairLibrariesAsync(http, gameDir, fabricVersionId, log);
 
         log?.Invoke("Sincronizando mods, resourcepacks e configs...");
         await ManagedFileSynchronizer.SyncAsync(http, gameDir, manifest, JsonOptions, log, byteProgress);
@@ -130,6 +133,10 @@ internal static class LauncherRuntime
 
         if (!FabricProfileInstaller.IsInstalled(gameDir, manifest.MinecraftVersion, manifest.FabricLoaderVersion))
             return new PackReadiness(false, "Fabric precisa ser instalado.");
+
+        var fabricVersion = FabricProfileInstaller.FindInstalledVersionId(gameDir, manifest.MinecraftVersion, manifest.FabricLoaderVersion);
+        if (fabricVersion is null || !await FabricProfileInstaller.HasRequiredLibrariesAsync(gameDir, fabricVersion))
+            return new PackReadiness(false, "Bibliotecas do Fabric precisam ser reparadas.");
 
         if (!await ManagedFileSynchronizer.IsSynchronizedAsync(gameDir, manifest, jsonOptions))
             return new PackReadiness(false, "Pack precisa ser atualizado.");
@@ -654,6 +661,12 @@ internal sealed class LauncherSettings
 
         loaded.OfflineUsername = string.IsNullOrWhiteSpace(loaded.OfflineUsername) ? "Player" : loaded.OfflineUsername.Trim();
         loaded.ManifestUrl = string.IsNullOrWhiteSpace(loaded.ManifestUrl) ? ProgramDefaults.ManifestUrl : loaded.ManifestUrl.Trim();
+        if (ProgramDefaults.IsLegacyManifestUrl(loaded.ManifestUrl))
+        {
+            loaded.ManifestUrl = ProgramDefaults.ManifestUrl;
+            normalized = true;
+        }
+
         loaded.GameDirectory = string.IsNullOrWhiteSpace(loaded.GameDirectory) ? "%APPDATA%\\.cobblemonlegacy" : loaded.GameDirectory.Trim();
         loaded.AuthMode = NormalizeAuthMode(loaded.AuthMode);
         loaded.MicrosoftUsername = loaded.MicrosoftUsername?.Trim() ?? "";
@@ -670,6 +683,9 @@ internal sealed class LauncherSettings
         AuthMode = NormalizeAuthMode(AuthMode);
         OfflineUsername = string.IsNullOrWhiteSpace(OfflineUsername) ? "Player" : OfflineUsername.Trim();
         ManifestUrl = string.IsNullOrWhiteSpace(ManifestUrl) ? ProgramDefaults.ManifestUrl : ManifestUrl.Trim();
+        if (ProgramDefaults.IsLegacyManifestUrl(ManifestUrl))
+            ManifestUrl = ProgramDefaults.ManifestUrl;
+
         GameDirectory = string.IsNullOrWhiteSpace(GameDirectory) ? "%APPDATA%\\.cobblemonlegacy" : GameDirectory.Trim();
         MaximumRamMb = Math.Max(1024, MaximumRamMb);
 
@@ -691,6 +707,11 @@ internal static class ProgramDefaults
 {
     public const string ManifestUrl = "https://raw.githubusercontent.com/gotardelo/cobblemonlegacy-downloads/main/manifest.json";
     public const string FabricMetaBaseUrl = "https://meta.fabricmc.net/v2";
+
+    public static bool IsLegacyManifestUrl(string value)
+    {
+        return value.Contains("raw.githubusercontent.com/gotardelo/modpackscobblemonlegacy", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 internal sealed record PackReadiness(bool IsReady, string Message);
@@ -821,13 +842,109 @@ internal static class ModpackManifestLoader
 
 internal static class FabricProfileInstaller
 {
+    private const string FabricKnotClientPath = "net/fabricmc/loader/impl/launch/knot/KnotClient.class";
+
     public static bool IsInstalled(string gameDir, string minecraftVersion, string loaderVersion)
     {
+        return FindInstalledVersionId(gameDir, minecraftVersion, loaderVersion) is not null;
+    }
+
+    public static string? FindInstalledVersionId(string gameDir, string minecraftVersion, string loaderVersion)
+    {
         if (string.Equals(loaderVersion, "latest", StringComparison.OrdinalIgnoreCase))
-            return FindInstalledFabricVersion(gameDir, minecraftVersion) is not null;
+            return FindInstalledFabricVersion(gameDir, minecraftVersion)?.VersionId;
 
         var versionId = $"fabric-loader-{loaderVersion}-{minecraftVersion}";
-        return File.Exists(Path.Combine(gameDir, "versions", versionId, $"{versionId}.json"));
+        return File.Exists(GetVersionJsonPath(gameDir, versionId)) ? versionId : null;
+    }
+
+    public static async Task<bool> HasRequiredLibrariesAsync(
+        string gameDir,
+        string versionId,
+        Action<string>? log = null)
+    {
+        var libraries = await ReadLibraryArtifactsAsync(gameDir, versionId);
+        if (libraries.Count == 0)
+        {
+            log?.Invoke($"Fabric {versionId} sem bibliotecas no perfil.");
+            return false;
+        }
+
+        foreach (var library in libraries)
+        {
+            if (!File.Exists(library.TargetPath))
+            {
+                log?.Invoke($"Biblioteca ausente: {library.RelativePath}");
+                return false;
+            }
+
+            if (library.Size is not null && new FileInfo(library.TargetPath).Length != library.Size.Value)
+            {
+                log?.Invoke($"Biblioteca com tamanho invalido: {library.RelativePath}");
+                return false;
+            }
+        }
+
+        var fabricLoader = libraries.FirstOrDefault(library =>
+            library.RelativePath.Replace('\\', '/').Contains("/fabric-loader/", StringComparison.OrdinalIgnoreCase));
+
+        if (fabricLoader is null || !JarContainsEntry(fabricLoader.TargetPath, FabricKnotClientPath))
+        {
+            log?.Invoke("Biblioteca fabric-loader invalida: KnotClient nao encontrado.");
+            return false;
+        }
+
+        return true;
+    }
+
+    public static async Task RepairLibrariesAsync(
+        HttpClient http,
+        string gameDir,
+        string versionId,
+        Action<string>? log = null)
+    {
+        var libraries = await ReadLibraryArtifactsAsync(gameDir, versionId);
+        var repaired = 0;
+
+        foreach (var library in libraries)
+        {
+            if (LibraryLooksValid(library))
+                continue;
+
+            if (string.IsNullOrWhiteSpace(library.Url))
+                throw new InvalidOperationException($"Biblioteca sem URL para reparo: {library.RelativePath}");
+
+            log?.Invoke($"Reparando biblioteca: {library.RelativePath}");
+            Directory.CreateDirectory(Path.GetDirectoryName(library.TargetPath)!);
+            var tempPath = $"{library.TargetPath}.download";
+
+            try
+            {
+                using var response = await http.GetAsync(library.Url, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
+
+                await using (var source = await response.Content.ReadAsStreamAsync())
+                await using (var destination = File.Create(tempPath))
+                {
+                    await source.CopyToAsync(destination);
+                }
+
+                File.Move(tempPath, library.TargetPath, true);
+                repaired++;
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+        }
+
+        if (!await HasRequiredLibrariesAsync(gameDir, versionId, log))
+            throw new InvalidOperationException("Nao foi possivel reparar as bibliotecas do Fabric. Tente novamente com a internet ativa.");
+
+        log?.Invoke(repaired == 0
+            ? "Bibliotecas do Fabric verificadas."
+            : $"Bibliotecas do Fabric reparadas: {repaired} arquivo(s).");
     }
 
     public static async Task<string> InstallAsync(
@@ -839,7 +956,7 @@ internal static class FabricProfileInstaller
     {
         var resolvedLoaderVersion = await ResolveLoaderVersionAsync(http, gameDir, minecraftVersion, loaderVersion, log);
         var expectedVersionId = $"fabric-loader-{resolvedLoaderVersion}-{minecraftVersion}";
-        var expectedJsonPath = Path.Combine(gameDir, "versions", expectedVersionId, $"{expectedVersionId}.json");
+        var expectedJsonPath = GetVersionJsonPath(gameDir, expectedVersionId);
 
         try
         {
@@ -858,6 +975,95 @@ internal static class FabricProfileInstaller
         {
             log?.Invoke($"Nao foi possivel atualizar o perfil Fabric ({ex.Message}). Usando perfil local.");
             return expectedVersionId;
+        }
+    }
+
+    private static string GetVersionJsonPath(string gameDir, string versionId)
+    {
+        return Path.Combine(gameDir, "versions", versionId, $"{versionId}.json");
+    }
+
+    private static bool LibraryLooksValid(LibraryArtifact library)
+    {
+        if (!File.Exists(library.TargetPath))
+            return false;
+
+        if (library.Size is not null && new FileInfo(library.TargetPath).Length != library.Size.Value)
+            return false;
+
+        var normalizedPath = library.RelativePath.Replace('\\', '/');
+        if (normalizedPath.Contains("/fabric-loader/", StringComparison.OrdinalIgnoreCase)
+            && !JarContainsEntry(library.TargetPath, FabricKnotClientPath))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static async Task<List<LibraryArtifact>> ReadLibraryArtifactsAsync(string gameDir, string versionId)
+    {
+        var jsonPath = GetVersionJsonPath(gameDir, versionId);
+        if (!File.Exists(jsonPath))
+            return [];
+
+        await using var stream = File.OpenRead(jsonPath);
+        using var document = await JsonDocument.ParseAsync(stream);
+        if (!document.RootElement.TryGetProperty("libraries", out var librariesElement)
+            || librariesElement.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var librariesRoot = Path.Combine(gameDir, "libraries");
+        var artifacts = new List<LibraryArtifact>();
+        foreach (var library in librariesElement.EnumerateArray())
+        {
+            if (!library.TryGetProperty("downloads", out var downloads)
+                || !downloads.TryGetProperty("artifact", out var artifact)
+                || artifact.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var relativePath = GetOptionalString(artifact, "path");
+            if (string.IsNullOrWhiteSpace(relativePath))
+                continue;
+
+            artifacts.Add(new LibraryArtifact(
+                relativePath.Replace('/', Path.DirectorySeparatorChar),
+                Path.Combine(librariesRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)),
+                GetOptionalString(artifact, "url"),
+                GetOptionalLong(artifact, "size")));
+        }
+
+        return artifacts;
+    }
+
+    private static string? GetOptionalString(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : null;
+    }
+
+    private static long? GetOptionalLong(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property) && property.TryGetInt64(out var value)
+            ? value
+            : null;
+    }
+
+    private static bool JarContainsEntry(string path, string entryName)
+    {
+        try
+        {
+            using var archive = ZipFile.OpenRead(path);
+            return archive.GetEntry(entryName) is not null;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -922,6 +1128,8 @@ internal static class FabricProfileInstaller
     }
 
     private sealed record InstalledFabricVersion(string VersionId, string LoaderVersion);
+
+    private sealed record LibraryArtifact(string RelativePath, string TargetPath, string? Url, long? Size);
 }
 
 internal static class ManagedFileSynchronizer
