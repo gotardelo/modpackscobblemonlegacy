@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.0.5";
+    public const string LauncherVersion = "1.0.6";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -1023,6 +1023,10 @@ internal static class FabricProfileInstaller
                 || !downloads.TryGetProperty("artifact", out var artifact)
                 || artifact.ValueKind != JsonValueKind.Object)
             {
+                var legacyArtifact = TryCreateLegacyArtifact(gameDir, library);
+                if (legacyArtifact is not null)
+                    artifacts.Add(legacyArtifact);
+
                 continue;
             }
 
@@ -1038,6 +1042,42 @@ internal static class FabricProfileInstaller
         }
 
         return artifacts;
+    }
+
+    private static LibraryArtifact? TryCreateLegacyArtifact(string gameDir, JsonElement library)
+    {
+        var name = GetOptionalString(library, "name");
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        var parts = name.Split(':');
+        if (parts.Length < 3)
+            return null;
+
+        var group = parts[0];
+        var artifact = parts[1];
+        var version = parts[2];
+        var classifier = parts.Length >= 4 ? parts[3] : "";
+        var fileName = string.IsNullOrWhiteSpace(classifier)
+            ? $"{artifact}-{version}.jar"
+            : $"{artifact}-{version}-{classifier}.jar";
+        var relativePath = Path.Combine(
+            group.Split('.').Concat(new[] { artifact, version, fileName }).ToArray());
+        var baseUrl = GetOptionalString(library, "url");
+        var url = string.IsNullOrWhiteSpace(baseUrl)
+            ? null
+            : new Uri(new Uri(EnsureTrailingSlash(baseUrl)), relativePath.Replace('\\', '/')).ToString();
+
+        return new LibraryArtifact(
+            relativePath,
+            Path.Combine(gameDir, "libraries", relativePath),
+            url,
+            GetOptionalLong(library, "size"));
+    }
+
+    private static string EnsureTrailingSlash(string value)
+    {
+        return value.EndsWith("/", StringComparison.Ordinal) ? value : $"{value}/";
     }
 
     private static string? GetOptionalString(JsonElement element, string propertyName)

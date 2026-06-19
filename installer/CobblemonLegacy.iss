@@ -1,5 +1,5 @@
 #define MyAppName "Cobblemon Legacy Launcher"
-#define MyAppVersion "1.0.5"
+#define MyAppVersion "1.0.6"
 #define MyAppPublisher "Cobblemon Legacy"
 #define MyAppExeName "CobblemonLegacy.exe"
 
