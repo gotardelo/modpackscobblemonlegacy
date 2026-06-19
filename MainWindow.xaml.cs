@@ -18,6 +18,7 @@ public partial class MainWindow : Window
 {
     private const int MaxVisibleLogCharacters = 12_000;
     private const long MaxUiLogBytes = 512 * 1024;
+    private static readonly TimeSpan MinecraftStartupWatchTime = TimeSpan.FromSeconds(20);
     private static readonly Regex NicknameRegex = new("^[A-Za-z0-9_]{3,16}$", RegexOptions.Compiled);
     private static readonly string UiLogPath = Path.Combine(
         Path.GetDirectoryName(LauncherSettings.SettingsPath)!,
@@ -280,6 +281,8 @@ public partial class MainWindow : Window
             SetStatus("Abrindo Minecraft...");
             var process = await LauncherRuntime.StartGameAsync(launcher, versionId, settings, session, AppendLog);
             AppendLog($"Minecraft iniciado com PID {process.Id}.");
+            await WaitForMinecraftStartupAsync(process, gameDir);
+
             SetStatus("Minecraft aberto. O launcher volta quando o jogo fechar.");
             await HideLauncherUntilGameExitsAsync(process);
             SetPrimaryAction(LauncherPrimaryAction.Ready);
@@ -297,6 +300,37 @@ public partial class MainWindow : Window
         finally
         {
             SetBusy(false);
+        }
+    }
+
+    private async Task WaitForMinecraftStartupAsync(Process process, string gameDir)
+    {
+        SetStatus("Minecraft iniciando... aguarde a janela abrir.");
+
+        var exitTask = process.WaitForExitAsync();
+        var startupTimer = Task.Delay(MinecraftStartupWatchTime);
+        var completedTask = await Task.WhenAny(exitTask, startupTimer);
+
+        if (completedTask != exitTask)
+            return;
+
+        var exitCode = TryGetExitCode(process);
+        var logHint = await LauncherRuntime.GetLatestMinecraftLogHintAsync(gameDir);
+        throw new InvalidOperationException(
+            $"O Minecraft fechou antes de abrir corretamente (codigo {exitCode}).{Environment.NewLine}" +
+            $"{logHint}{Environment.NewLine}" +
+            "O launcher ficou aberto para voce tentar novamente ou enviar esse erro para o suporte.");
+    }
+
+    private static string TryGetExitCode(Process process)
+    {
+        try
+        {
+            return process.ExitCode.ToString();
+        }
+        catch
+        {
+            return "desconhecido";
         }
     }
 

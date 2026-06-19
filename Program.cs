@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -152,11 +153,12 @@ internal static class LauncherRuntime
         if (stoppedProcesses > 0)
             await Task.Delay(750);
 
+        var maximumRamMb = ResolveMaximumRamMb(settings.MaximumRamMb, log);
         var process = await launcher.BuildProcessAsync(versionId, new MLaunchOption
         {
             Session = session,
-            MaximumRamMb = settings.MaximumRamMb,
-            MinimumRamMb = Math.Min(1024, settings.MaximumRamMb),
+            MaximumRamMb = maximumRamMb,
+            MinimumRamMb = Math.Min(1024, maximumRamMb),
             GameLauncherName = "CobblemonLegacy",
             GameLauncherVersion = "1.0"
         });
@@ -185,6 +187,79 @@ internal static class LauncherRuntime
         };
 
         return process;
+    }
+
+    public static async Task<string> GetLatestMinecraftLogHintAsync(string gameDir)
+    {
+        var latestLogPath = Path.Combine(gameDir, "logs", "latest.log");
+        if (!File.Exists(latestLogPath))
+            return $"Log do Minecraft ainda nao foi criado em: {latestLogPath}";
+
+        try
+        {
+            var lines = await File.ReadAllLinesAsync(latestLogPath, Encoding.UTF8);
+            var tail = lines
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .TakeLast(10);
+
+            return $"Ultimas linhas do log ({latestLogPath}):{Environment.NewLine}{string.Join(Environment.NewLine, tail)}";
+        }
+        catch (Exception ex)
+        {
+            return $"Nao foi possivel ler o latest.log ({latestLogPath}): {ex.Message}";
+        }
+    }
+
+    private static int ResolveMaximumRamMb(int requestedRamMb, Action<string>? log = null)
+    {
+        requestedRamMb = Math.Max(2_048, requestedRamMb);
+        var totalRamMb = TryGetTotalPhysicalMemoryMb();
+        if (totalRamMb is null)
+            return requestedRamMb;
+
+        var recommendedRamMb = totalRamMb.Value switch
+        {
+            >= 16_384 => 8_192,
+            >= 12_288 => 6_144,
+            >= 8_192 => 4_096,
+            _ => 3_072
+        };
+        var reservedForWindowsMb = totalRamMb.Value >= 12_288 ? 4_096 : 2_048;
+        var safeRamMb = Math.Max(2_048, totalRamMb.Value - reservedForWindowsMb);
+        var resolvedRamMb = Math.Clamp(Math.Min(requestedRamMb, Math.Min(recommendedRamMb, safeRamMb)), 2_048, requestedRamMb);
+
+        if (resolvedRamMb != requestedRamMb)
+            log?.Invoke($"RAM ajustada automaticamente: {requestedRamMb} MB -> {resolvedRamMb} MB ({totalRamMb.Value} MB fisicos detectados).");
+        else
+            log?.Invoke($"RAM do Minecraft: {resolvedRamMb} MB ({totalRamMb.Value} MB fisicos detectados).");
+
+        return resolvedRamMb;
+    }
+
+    private static int? TryGetTotalPhysicalMemoryMb()
+    {
+        var status = new MemoryStatusEx();
+        if (!GlobalMemoryStatusEx(status))
+            return null;
+
+        return (int)Math.Max(1, status.TotalPhys / 1024 / 1024);
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatusEx lpBuffer);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private sealed class MemoryStatusEx
+    {
+        public uint Length = (uint)Marshal.SizeOf<MemoryStatusEx>();
+        public uint MemoryLoad;
+        public ulong TotalPhys;
+        public ulong AvailPhys;
+        public ulong TotalPageFile;
+        public ulong AvailPageFile;
+        public ulong TotalVirtual;
+        public ulong AvailVirtual;
+        public ulong AvailExtendedVirtual;
     }
 
     private static void ConfigureMinecraftProcess(System.Diagnostics.Process process, Action<string>? log)
