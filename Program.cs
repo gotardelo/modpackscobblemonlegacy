@@ -18,12 +18,15 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.0.7";
+    public const string LauncherVersion = "1.0.8";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
     private static readonly Regex SensitiveLaunchArgumentRegex = new(
         @"(--(?:accessToken|uuid|xuid|clientId)\s+)(""[^""]*""|\S+)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex MemoryJvmArgumentRegex = new(
+        @"(^|\s)-Xm[sx]\S*",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -162,15 +165,24 @@ internal static class LauncherRuntime
             await Task.Delay(750);
 
         var maximumRamMb = ResolveMaximumRamMb(settings.MaximumRamMb, log);
-        var process = await launcher.BuildProcessAsync(versionId, new MLaunchOption
+        var launchOptions = new MLaunchOption
         {
             Session = session,
             MaximumRamMb = maximumRamMb,
             MinimumRamMb = Math.Min(1024, maximumRamMb),
-            ExtraJvmArguments = BuildPerformanceJvmArguments(),
+            ScreenWidth = settings.WindowWidth,
+            ScreenHeight = settings.WindowHeight,
+            FullScreen = settings.FullScreen,
+            ExtraJvmArguments = BuildPerformanceJvmArguments(settings),
             GameLauncherName = "CobblemonLegacy",
             GameLauncherVersion = LauncherVersion
-        });
+        };
+
+        var javaPath = ResolveJavaPath(settings, log);
+        if (!string.IsNullOrWhiteSpace(javaPath))
+            launchOptions.JavaPath = javaPath;
+
+        var process = await launcher.BuildProcessAsync(versionId, launchOptions);
 
         ConfigureMinecraftProcess(process, log);
         await WriteLaunchDiagnosticsAsync(process.StartInfo);
@@ -331,7 +343,7 @@ internal static class LauncherRuntime
         };
     }
 
-    private static MArgument[] BuildPerformanceJvmArguments()
+    private static MArgument[] BuildPerformanceJvmArguments(LauncherSettings settings)
     {
         var arguments = new List<MArgument>
         {
@@ -340,7 +352,38 @@ internal static class LauncherRuntime
             new("-Dsun.rmi.dgc.client.gcInterval=2147483646")
         };
 
+        if (settings.CompatibilityMode)
+        {
+            arguments.Add(new("-Djava.net.preferIPv4Stack=true"));
+            arguments.Add(new("-Dfile.encoding=UTF-8"));
+        }
+
+        var customArguments = RemoveMemoryJvmArguments(settings.ExtraJvmArguments);
+        if (!string.IsNullOrWhiteSpace(customArguments))
+            arguments.Add(MArgument.FromCommandLine(customArguments));
+
         return arguments.ToArray();
+    }
+
+    private static string RemoveMemoryJvmArguments(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "";
+
+        return MemoryJvmArgumentRegex.Replace(value, "$1").Trim();
+    }
+
+    private static string? ResolveJavaPath(LauncherSettings settings, Action<string>? log = null)
+    {
+        if (settings.UseIntegratedJava || string.IsNullOrWhiteSpace(settings.JavaPath))
+            return null;
+
+        var javaPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(settings.JavaPath.Trim()));
+        if (!File.Exists(javaPath))
+            throw new InvalidOperationException($"Java customizado nao encontrado: {javaPath}");
+
+        log?.Invoke($"Java customizado selecionado: {javaPath}");
+        return javaPath;
     }
 
     private static PhysicalMemoryInfo? TryGetPhysicalMemoryMb()
@@ -586,6 +629,13 @@ internal static class LauncherRuntime
         report.AppendLine($"OfflineUsername: {settings?.OfflineUsername ?? "desconhecido"}");
         report.AppendLine($"MicrosoftUsername: {settings?.MicrosoftUsername ?? ""}");
         report.AppendLine($"RAM configurada: {settings?.MaximumRamMb.ToString() ?? "desconhecida"} MB");
+        report.AppendLine($"Resolucao configurada: {(settings is null ? "desconhecida" : $"{settings.WindowWidth}x{settings.WindowHeight}")}");
+        report.AppendLine($"Tela cheia: {settings?.FullScreen.ToString() ?? "desconhecido"}");
+        report.AppendLine($"Visibilidade launcher: {settings?.LauncherVisibility ?? "desconhecida"}");
+        report.AppendLine($"Modo compatibilidade: {settings?.CompatibilityMode.ToString() ?? "desconhecido"}");
+        report.AppendLine($"Java integrado: {settings?.UseIntegratedJava.ToString() ?? "desconhecido"}");
+        report.AppendLine($"Java customizado: {settings?.JavaPath ?? ""}");
+        report.AppendLine($"JVM extra: {settings?.ExtraJvmArguments ?? ""}");
         report.AppendLine($"ManifestUrl: {settings?.ManifestUrl ?? ProgramDefaults.ManifestUrl}");
         report.AppendLine($"Ultimo status: {lastStatus}");
         report.AppendLine();
@@ -680,7 +730,14 @@ internal static class AuthModes
     public const string Offline = "offline";
 }
 
-internal sealed class LauncherSettings
+internal static class LauncherVisibilityModes
+{
+    public const string HideUntilGameExits = "hide";
+    public const string MinimizeUntilGameExits = "minimize";
+    public const string KeepOpen = "keep-open";
+}
+
+public sealed class LauncherSettings
 {
     private const int LegacyRecommendedRamMb = 8192;
 
@@ -695,7 +752,56 @@ internal sealed class LauncherSettings
     public string AuthMode { get; set; } = "";
     public string MicrosoftUsername { get; set; } = "";
     public int MaximumRamMb { get; set; } = LauncherRuntime.GetRecommendedMaximumRamMb();
+    public int WindowWidth { get; set; } = 854;
+    public int WindowHeight { get; set; } = 480;
+    public bool FullScreen { get; set; }
+    public string LauncherVisibility { get; set; } = LauncherVisibilityModes.HideUntilGameExits;
+    public bool CompatibilityMode { get; set; }
+    public bool UseIntegratedJava { get; set; } = true;
+    public string JavaPath { get; set; } = "";
+    public string ExtraJvmArguments { get; set; } = "";
     public int PerformancePresetVersion { get; set; }
+
+    public LauncherSettings Clone()
+    {
+        return new LauncherSettings
+        {
+            ManifestUrl = ManifestUrl,
+            GameDirectory = GameDirectory,
+            OfflineUsername = OfflineUsername,
+            AuthMode = AuthMode,
+            MicrosoftUsername = MicrosoftUsername,
+            MaximumRamMb = MaximumRamMb,
+            WindowWidth = WindowWidth,
+            WindowHeight = WindowHeight,
+            FullScreen = FullScreen,
+            LauncherVisibility = LauncherVisibility,
+            CompatibilityMode = CompatibilityMode,
+            UseIntegratedJava = UseIntegratedJava,
+            JavaPath = JavaPath,
+            ExtraJvmArguments = ExtraJvmArguments,
+            PerformancePresetVersion = PerformancePresetVersion
+        };
+    }
+
+    public void ApplyFrom(LauncherSettings source)
+    {
+        ManifestUrl = source.ManifestUrl;
+        GameDirectory = source.GameDirectory;
+        OfflineUsername = source.OfflineUsername;
+        AuthMode = source.AuthMode;
+        MicrosoftUsername = source.MicrosoftUsername;
+        MaximumRamMb = source.MaximumRamMb;
+        WindowWidth = source.WindowWidth;
+        WindowHeight = source.WindowHeight;
+        FullScreen = source.FullScreen;
+        LauncherVisibility = source.LauncherVisibility;
+        CompatibilityMode = source.CompatibilityMode;
+        UseIntegratedJava = source.UseIntegratedJava;
+        JavaPath = source.JavaPath;
+        ExtraJvmArguments = source.ExtraJvmArguments;
+        PerformancePresetVersion = source.PerformancePresetVersion;
+    }
 
     public static async Task<LauncherSettings> LoadAsync(JsonSerializerOptions jsonOptions)
     {
@@ -734,6 +840,7 @@ internal sealed class LauncherSettings
         loaded.GameDirectory = string.IsNullOrWhiteSpace(loaded.GameDirectory) ? "%APPDATA%\\.cobblemonlegacy" : loaded.GameDirectory.Trim();
         loaded.AuthMode = NormalizeAuthMode(loaded.AuthMode);
         loaded.MicrosoftUsername = loaded.MicrosoftUsername?.Trim() ?? "";
+        loaded.NormalizeRuntimeOptions();
 
         if (normalized)
             await loaded.SaveAsync(jsonOptions);
@@ -752,8 +859,21 @@ internal sealed class LauncherSettings
 
         GameDirectory = string.IsNullOrWhiteSpace(GameDirectory) ? "%APPDATA%\\.cobblemonlegacy" : GameDirectory.Trim();
         MaximumRamMb = Math.Clamp(MaximumRamMb, 2048, 8192);
+        NormalizeRuntimeOptions();
 
         await File.WriteAllTextAsync(SettingsPath, JsonSerializer.Serialize(this, jsonOptions), Encoding.UTF8);
+    }
+
+    private void NormalizeRuntimeOptions()
+    {
+        WindowWidth = Math.Clamp(WindowWidth <= 0 ? 854 : WindowWidth, 640, 3840);
+        WindowHeight = Math.Clamp(WindowHeight <= 0 ? 480 : WindowHeight, 360, 2160);
+        LauncherVisibility = NormalizeLauncherVisibility(LauncherVisibility);
+        JavaPath = JavaPath?.Trim() ?? "";
+        ExtraJvmArguments = ExtraJvmArguments?.Trim() ?? "";
+
+        if (string.IsNullOrWhiteSpace(JavaPath))
+            UseIntegratedJava = true;
     }
 
     private static string NormalizeAuthMode(string? value)
@@ -763,6 +883,17 @@ internal sealed class LauncherSettings
             AuthModes.Microsoft => AuthModes.Microsoft,
             AuthModes.Offline => AuthModes.Offline,
             _ => ""
+        };
+    }
+
+    private static string NormalizeLauncherVisibility(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            LauncherVisibilityModes.HideUntilGameExits => LauncherVisibilityModes.HideUntilGameExits,
+            LauncherVisibilityModes.MinimizeUntilGameExits => LauncherVisibilityModes.MinimizeUntilGameExits,
+            LauncherVisibilityModes.KeepOpen => LauncherVisibilityModes.KeepOpen,
+            _ => LauncherVisibilityModes.HideUntilGameExits
         };
     }
 }

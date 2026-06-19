@@ -283,8 +283,8 @@ public partial class MainWindow : Window
             AppendLog($"Minecraft iniciado com PID {process.Id}.");
             await WaitForMinecraftStartupAsync(process, gameDir);
 
-            SetStatus("Minecraft aberto. O launcher volta quando o jogo fechar.");
-            await HideLauncherUntilGameExitsAsync(process);
+            SetStatus(GetMinecraftRunningStatus());
+            await MonitorLauncherDuringGameAsync(process);
             SetPrimaryAction(LauncherPrimaryAction.Ready);
         }
         catch (Exception ex) when (IsMicrosoftAuthCancellation(ex))
@@ -331,6 +331,63 @@ public partial class MainWindow : Window
         catch
         {
             return "desconhecido";
+        }
+    }
+
+    private string GetMinecraftRunningStatus()
+    {
+        return settings?.LauncherVisibility switch
+        {
+            LauncherVisibilityModes.KeepOpen => "Minecraft aberto. O launcher ficara aberto.",
+            LauncherVisibilityModes.MinimizeUntilGameExits => "Minecraft aberto. Launcher minimizado ate o jogo fechar.",
+            _ => "Minecraft aberto. O launcher volta quando o jogo fechar."
+        };
+    }
+
+    private async Task MonitorLauncherDuringGameAsync(Process process)
+    {
+        switch (settings?.LauncherVisibility)
+        {
+            case LauncherVisibilityModes.KeepOpen:
+                await WaitForGameExitWithLauncherOpenAsync(process);
+                break;
+            case LauncherVisibilityModes.MinimizeUntilGameExits:
+                await MinimizeLauncherUntilGameExitsAsync(process);
+                break;
+            default:
+                await HideLauncherUntilGameExitsAsync(process);
+                break;
+        }
+    }
+
+    private async Task WaitForGameExitWithLauncherOpenAsync(Process process)
+    {
+        if (!process.HasExited)
+            await process.WaitForExitAsync();
+
+        if (!isClosing)
+            SetStatus("Minecraft fechado. Launcher pronto.");
+    }
+
+    private async Task MinimizeLauncherUntilGameExitsAsync(Process process)
+    {
+        var previousState = WindowState;
+
+        try
+        {
+            WindowState = WindowState.Minimized;
+
+            if (!process.HasExited)
+                await process.WaitForExitAsync();
+        }
+        finally
+        {
+            if (!isClosing)
+            {
+                WindowState = previousState == WindowState.Minimized ? WindowState.Normal : previousState;
+                Activate();
+                SetStatus("Minecraft fechado. Launcher reaberto.");
+            }
         }
     }
 
@@ -586,6 +643,33 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             ShowError($"Nao foi possivel gerar o relatorio: {ex.Message}");
+        }
+    }
+
+    private async void OptionsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (settings is null || isBusy)
+                return;
+
+            var dialog = new OptionsWindow(settings)
+            {
+                Owner = this
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            settings.ApplyFrom(dialog.Settings);
+            await settings.SaveAsync(LauncherRuntime.JsonOptions);
+            ApplySettingsToUi();
+            await RefreshPrimaryActionAsync();
+            SetStatus("Opcoes salvas.");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Nao foi possivel salvar as opcoes: {ex.Message}");
         }
     }
 

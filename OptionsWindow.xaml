@@ -1,0 +1,291 @@
+<Window x:Class="CobblemonLegacy.OptionsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Opcoes"
+        Width="660"
+        Height="720"
+        MinWidth="620"
+        MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Icon="Assets/launcher-icon.ico">
+    <Window.Resources>
+        <DropShadowEffect x:Key="PanelShadow"
+                          Color="#000000"
+                          BlurRadius="28"
+                          ShadowDepth="8"
+                          Opacity="0.78" />
+
+        <Style x:Key="OptionTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontFamily" Value="{StaticResource GameDisplayFont}" />
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#F3FAFF" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,16,0,7" />
+        </Style>
+
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#91A8B8" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,5,0,0" />
+        </Style>
+
+        <Style x:Key="OptionTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Background" Value="#CA081018" />
+            <Setter Property="BorderBrush" Value="#496C84" />
+        </Style>
+
+        <Style x:Key="SmallOptionButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Foreground" Value="#F3FAFF" />
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#D7E8F4" />
+            <Setter Property="FontFamily" Value="{StaticResource GameUiFont}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Margin" Value="0,8,0,0" />
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Foreground" Value="#F3FAFF" />
+            <Setter Property="Background" Value="#CA081018" />
+            <Setter Property="BorderBrush" Value="#496C84" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="FontFamily" Value="{StaticResource GameUiFont}" />
+            <Setter Property="FontSize" Value="15" />
+        </Style>
+    </Window.Resources>
+
+    <Border CornerRadius="8"
+            BorderBrush="#5A88A8BE"
+            BorderThickness="1"
+            Background="#F0050B11"
+            Effect="{StaticResource PanelShadow}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="58" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="66" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#10162128" Offset="0" />
+                        <GradientStop Color="#10223B49" Offset="0.56" />
+                        <GradientStop Color="#100B141B" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Grid Margin="22,0,10,0">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Opcoes do Launcher"
+                                   Style="{StaticResource OptionTitle}" />
+                        <TextBlock Text="Cobblemon Legacy"
+                                   Foreground="{StaticResource CyanBrush}"
+                                   FontSize="11"
+                                   FontWeight="Bold" />
+                    </StackPanel>
+                    <Button Content="X"
+                            Width="34"
+                            Height="28"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource SecondaryButton}"
+                            Padding="0"
+                            Click="CancelButton_Click" />
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="32,8,32,24">
+                    <TextBlock Text="Nome da instalacao"
+                               Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="Cobblemon Legacy"
+                             IsReadOnly="True"
+                             Style="{StaticResource OptionTextBox}" />
+
+                    <TextBlock Text="Versao"
+                               Style="{StaticResource FieldLabel}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Text="Minecraft 1.21.1"
+                                 IsReadOnly="True"
+                                 Style="{StaticResource OptionTextBox}" />
+                        <TextBox Grid.Column="2"
+                                 Text="Fabric"
+                                 IsReadOnly="True"
+                                 Style="{StaticResource OptionTextBox}" />
+                    </Grid>
+
+                    <TextBlock Text="Diretorio do jogo"
+                               Style="{StaticResource FieldLabel}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="44" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="GameDirectoryTextBox"
+                                 Style="{StaticResource OptionTextBox}" />
+                        <Button Grid.Column="2"
+                                Content="..."
+                                Style="{StaticResource SmallOptionButton}"
+                                MinWidth="44"
+                                Padding="0"
+                                Click="BrowseGameDirectoryButton_Click" />
+                    </Grid>
+
+                    <Border Height="1"
+                            Margin="0,22,0,2"
+                            Background="#345A7890" />
+
+                    <TextBlock Text="Mais opcoes"
+                               Style="{StaticResource FieldLabel}" />
+
+                    <TextBlock Text="Resolucao"
+                               Style="{StaticResource FieldLabel}"
+                               Margin="0,4,0,7" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="WindowWidthTextBox"
+                                 Style="{StaticResource OptionTextBox}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="x"
+                                   Foreground="#8DA4B4"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="16" />
+                        <TextBox x:Name="WindowHeightTextBox"
+                                 Grid.Column="2"
+                                 Style="{StaticResource OptionTextBox}" />
+                        <CheckBox x:Name="FullScreenCheckBox"
+                                  Grid.Column="3"
+                                  Content="Tela cheia"
+                                  VerticalAlignment="Center"
+                                  Margin="18,0,0,0" />
+                    </Grid>
+
+                    <TextBlock Text="Memoria maxima (RAM)"
+                               Style="{StaticResource FieldLabel}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="92" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="RamTextBox"
+                                 Style="{StaticResource OptionTextBox}" />
+                        <Button Grid.Column="2"
+                                Content="Auto"
+                                Style="{StaticResource SmallOptionButton}"
+                                Click="AutoRamButton_Click" />
+                    </Grid>
+                    <TextBlock Text="Use MB. Exemplo: 3072, 4096, 6144 ou 8192."
+                               Style="{StaticResource HintText}" />
+
+                    <TextBlock Text="Modo de compatibilidade"
+                               Style="{StaticResource FieldLabel}" />
+                    <CheckBox x:Name="CompatibilityModeCheckBox"
+                              Content="Ativar modo de compatibilidade" />
+                    <TextBlock Text="Use se o jogador tiver problema de rede, Java ou PC mais antigo."
+                               Style="{StaticResource HintText}" />
+
+                    <TextBlock Text="Visibilidade do launcher"
+                               Style="{StaticResource FieldLabel}" />
+                    <ComboBox x:Name="LauncherVisibilityComboBox"
+                              SelectedValuePath="Tag">
+                        <ComboBoxItem Content="Esconder e reabrir quando o jogo fechar"
+                                      Tag="hide" />
+                        <ComboBoxItem Content="Minimizar e reabrir quando o jogo fechar"
+                                      Tag="minimize" />
+                        <ComboBoxItem Content="Manter launcher aberto"
+                                      Tag="keep-open" />
+                    </ComboBox>
+
+                    <TextBlock Text="Executavel Java"
+                               Style="{StaticResource FieldLabel}" />
+                    <CheckBox x:Name="UseIntegratedJavaCheckBox"
+                              Content="Usar o Java Runtime integrado"
+                              Click="UseIntegratedJavaCheckBox_Click" />
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="44" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="JavaPathTextBox"
+                                 Style="{StaticResource OptionTextBox}" />
+                        <Button Grid.Column="2"
+                                Content="..."
+                                Style="{StaticResource SmallOptionButton}"
+                                MinWidth="44"
+                                Padding="0"
+                                Click="BrowseJavaButton_Click" />
+                    </Grid>
+
+                    <TextBlock Text="Argumentos da JVM"
+                               Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="ExtraJvmArgumentsTextBox"
+                             Height="74"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             Style="{StaticResource OptionTextBox}" />
+                    <TextBlock Text="Nao use -Xmx ou -Xms aqui. A memoria maxima acima controla isso."
+                               Style="{StaticResource HintText}" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <Border Grid.Row="2"
+                    BorderBrush="#223D536A"
+                    BorderThickness="0,1,0,0"
+                    Background="#F2070D12">
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,24,0">
+                    <Button Content="Cancelar"
+                            Style="{StaticResource SecondaryButton}"
+                            Width="104"
+                            Height="38"
+                            Padding="0"
+                            Click="CancelButton_Click" />
+                    <Button Content="Salvar"
+                            Width="104"
+                            Height="38"
+                            Padding="0"
+                            Margin="10,0,0,0"
+                            Click="SaveButton_Click" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
