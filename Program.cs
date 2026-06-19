@@ -17,6 +17,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
+    public const string LauncherVersion = "1.0.4";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -160,7 +161,7 @@ internal static class LauncherRuntime
             MaximumRamMb = maximumRamMb,
             MinimumRamMb = Math.Min(1024, maximumRamMb),
             GameLauncherName = "CobblemonLegacy",
-            GameLauncherVersion = "1.0"
+            GameLauncherVersion = LauncherVersion
         });
 
         ConfigureMinecraftProcess(process, log);
@@ -486,7 +487,128 @@ internal static class LauncherRuntime
 
         return $"{size:0.##} {units[unit]}";
     }
+
+    public static async Task<CrashReportResult> CreateCrashReportAsync(
+        LauncherSettings? settings,
+        string visibleLog,
+        string lastStatus)
+    {
+        var diagnosticsDir = Path.GetDirectoryName(LauncherSettings.SettingsPath)!;
+        var reportsDir = Path.Combine(diagnosticsDir, "crash-reports");
+        Directory.CreateDirectory(reportsDir);
+
+        var gameDir = settings is null
+            ? Path.GetFullPath(Environment.ExpandEnvironmentVariables("%APPDATA%\\.cobblemonlegacy"))
+            : ExpandGameDirectory(settings);
+        var reportPath = Path.Combine(reportsDir, $"CobblemonLegacy-Report-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+        var report = new StringBuilder();
+
+        AppendReportHeader(report, settings, gameDir, lastStatus);
+        await AppendKnownLogFilesAsync(report, diagnosticsDir, gameDir);
+        AppendSection(report, "Launcher UI visivel", string.IsNullOrWhiteSpace(visibleLog) ? "Sem log visivel." : visibleLog);
+
+        await File.WriteAllTextAsync(reportPath, report.ToString(), Encoding.UTF8);
+        return new CrashReportResult(reportPath, report.ToString());
+    }
+
+    private static void AppendReportHeader(StringBuilder report, LauncherSettings? settings, string gameDir, string lastStatus)
+    {
+        var memory = TryGetPhysicalMemoryMb();
+        report.AppendLine("COBBLEMON LEGACY - RELATORIO DE ERRO");
+        report.AppendLine($"Gerado em: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        report.AppendLine($"Launcher: {LauncherVersion}");
+        report.AppendLine($"Servidor: {ServerIp}");
+        report.AppendLine($"Windows: {Environment.OSVersion}");
+        report.AppendLine($".NET: {Environment.Version}");
+        report.AppendLine($"64-bit OS: {Environment.Is64BitOperatingSystem}");
+        report.AppendLine($"64-bit processo: {Environment.Is64BitProcess}");
+        report.AppendLine($"Memoria fisica: {(memory is null ? "desconhecida" : $"{memory.TotalMb} MB total / {memory.AvailableMb} MB livre")}");
+        report.AppendLine($"GameDir: {gameDir}");
+        report.AppendLine($"Settings: {LauncherSettings.SettingsPath}");
+        report.AppendLine($"AuthMode: {settings?.AuthMode ?? "desconhecido"}");
+        report.AppendLine($"OfflineUsername: {settings?.OfflineUsername ?? "desconhecido"}");
+        report.AppendLine($"MicrosoftUsername: {settings?.MicrosoftUsername ?? ""}");
+        report.AppendLine($"RAM configurada: {settings?.MaximumRamMb.ToString() ?? "desconhecida"} MB");
+        report.AppendLine($"ManifestUrl: {settings?.ManifestUrl ?? ProgramDefaults.ManifestUrl}");
+        report.AppendLine($"Ultimo status: {lastStatus}");
+        report.AppendLine();
+    }
+
+    private static async Task AppendKnownLogFilesAsync(StringBuilder report, string diagnosticsDir, string gameDir)
+    {
+        var latestCrashReport = FindNewestFile(Path.Combine(gameDir, "crash-reports"), "crash-*.txt");
+        var latestJavaCrash = FindNewestJavaCrashLog(gameDir);
+        var files = new[]
+        {
+            new ReportFile("Launcher UI log", Path.Combine(diagnosticsDir, "launcher-ui.log"), 180),
+            new ReportFile("Launcher process log", Path.Combine(diagnosticsDir, "launcher.log"), 120),
+            new ReportFile("Saida do Java", Path.Combine(diagnosticsDir, "minecraft-process.log"), 180),
+            new ReportFile("Ultimo comando sanitizado", Path.Combine(diagnosticsDir, "last-launch-command.txt"), 40),
+            new ReportFile("Minecraft latest.log", Path.Combine(gameDir, "logs", "latest.log"), 220),
+            new ReportFile("Minecraft crash report", latestCrashReport, 220),
+            new ReportFile("Java crash log", latestJavaCrash, 220)
+        };
+
+        foreach (var file in files)
+            await AppendFileTailAsync(report, file);
+    }
+
+    private static async Task AppendFileTailAsync(StringBuilder report, ReportFile file)
+    {
+        report.AppendLine($"===== {file.Title} =====");
+
+        if (string.IsNullOrWhiteSpace(file.Path) || !File.Exists(file.Path))
+        {
+            report.AppendLine("Arquivo nao encontrado.");
+            report.AppendLine();
+            return;
+        }
+
+        report.AppendLine(file.Path);
+        try
+        {
+            var lines = await File.ReadAllLinesAsync(file.Path, Encoding.UTF8);
+            foreach (var line in lines.TakeLast(file.MaxLines))
+                report.AppendLine(line);
+        }
+        catch (Exception ex)
+        {
+            report.AppendLine($"Nao foi possivel ler arquivo: {ex.Message}");
+        }
+
+        report.AppendLine();
+    }
+
+    private static void AppendSection(StringBuilder report, string title, string content)
+    {
+        report.AppendLine($"===== {title} =====");
+        report.AppendLine(content);
+        report.AppendLine();
+    }
+
+    private static string? FindNewestFile(string directory, string pattern)
+    {
+        try
+        {
+            if (!Directory.Exists(directory))
+                return null;
+
+            return Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly)
+                .Select(path => new FileInfo(path))
+                .OrderByDescending(file => file.LastWriteTimeUtc)
+                .FirstOrDefault()
+                ?.FullName;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private sealed record ReportFile(string Title, string? Path, int MaxLines);
 }
+
+internal sealed record CrashReportResult(string Path, string Text);
 
 internal static class AuthModes
 {

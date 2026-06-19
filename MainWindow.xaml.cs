@@ -570,6 +570,25 @@ public partial class MainWindow : Window
         OpenExternalUrl("https://www.cobblemonlegacy.com.br");
     }
 
+    private async void CrashReportButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var report = await LauncherRuntime.CreateCrashReportAsync(
+                settings,
+                LogTextBox.Text,
+                StatusText.Text);
+
+            Clipboard.SetText(report.Text);
+            OpenFileLocation(report.Path);
+            SetStatus("Relatorio de erro copiado. Envie o arquivo ou cole no Discord.");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Nao foi possivel gerar o relatorio: {ex.Message}");
+        }
+    }
+
     private void OpenExternalUrl(string url)
     {
         try
@@ -582,6 +601,23 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             ShowError($"Nao foi possivel abrir o link: {ex.Message}");
+        }
+    }
+
+    private void OpenFileLocation(string path)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
         }
     }
 
