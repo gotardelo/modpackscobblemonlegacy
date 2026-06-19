@@ -165,6 +165,7 @@ internal static class LauncherRuntime
 
         ConfigureMinecraftProcess(process, log);
         await WriteLaunchDiagnosticsAsync(process.StartInfo);
+        ClearMinecraftProcessLog();
 
         if (!process.Start())
             throw new InvalidOperationException("O processo do Minecraft nao iniciou.");
@@ -192,58 +193,110 @@ internal static class LauncherRuntime
     public static async Task<string> GetLatestMinecraftLogHintAsync(string gameDir)
     {
         var latestLogPath = Path.Combine(gameDir, "logs", "latest.log");
-        if (!File.Exists(latestLogPath))
-            return $"Log do Minecraft ainda nao foi criado em: {latestLogPath}";
+        var processLogPath = Path.Combine(Path.GetDirectoryName(LauncherSettings.SettingsPath)!, "minecraft-process.log");
+        var javaCrashLogPath = FindNewestJavaCrashLog(gameDir);
 
         try
         {
-            var lines = await File.ReadAllLinesAsync(latestLogPath, Encoding.UTF8);
-            var tail = lines
-                .Where(line => !string.IsNullOrWhiteSpace(line))
-                .TakeLast(10);
+            if (File.Exists(latestLogPath))
+                return await ReadTailHintAsync(latestLogPath, "Ultimas linhas do latest.log");
 
-            return $"Ultimas linhas do log ({latestLogPath}):{Environment.NewLine}{string.Join(Environment.NewLine, tail)}";
+            if (File.Exists(processLogPath))
+                return await ReadTailHintAsync(processLogPath, "Saida do Java antes do Minecraft abrir");
+
+            if (javaCrashLogPath is not null)
+                return await ReadTailHintAsync(javaCrashLogPath, "Crash log do Java");
+
+            return
+                $"O Minecraft ainda nao criou latest.log em: {latestLogPath}{Environment.NewLine}" +
+                $"Tambem nao encontrei saida do Java em: {processLogPath}";
         }
         catch (Exception ex)
         {
-            return $"Nao foi possivel ler o latest.log ({latestLogPath}): {ex.Message}";
+            return $"Nao foi possivel ler os logs do Minecraft: {ex.Message}";
+        }
+    }
+
+    private static async Task<string> ReadTailHintAsync(string path, string title)
+    {
+        var lines = await File.ReadAllLinesAsync(path, Encoding.UTF8);
+        var tail = lines
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .TakeLast(12);
+
+        return $"{title} ({path}):{Environment.NewLine}{string.Join(Environment.NewLine, tail)}";
+    }
+
+    private static string? FindNewestJavaCrashLog(string gameDir)
+    {
+        try
+        {
+            var searchRoots = new[]
+            {
+                gameDir,
+                Path.GetDirectoryName(LauncherSettings.SettingsPath)!
+            };
+
+            return searchRoots
+                .Where(Directory.Exists)
+                .SelectMany(root => Directory.EnumerateFiles(root, "hs_err_pid*.log", SearchOption.TopDirectoryOnly))
+                .Select(path => new FileInfo(path))
+                .OrderByDescending(file => file.LastWriteTimeUtc)
+                .FirstOrDefault()
+                ?.FullName;
+        }
+        catch
+        {
+            return null;
         }
     }
 
     private static int ResolveMaximumRamMb(int requestedRamMb, Action<string>? log = null)
     {
         requestedRamMb = Math.Max(2_048, requestedRamMb);
-        var totalRamMb = TryGetTotalPhysicalMemoryMb();
-        if (totalRamMb is null)
+        var memory = TryGetPhysicalMemoryMb();
+        if (memory is null)
             return requestedRamMb;
 
-        var recommendedRamMb = totalRamMb.Value switch
+        var recommendedRamMb = memory.TotalMb switch
         {
             >= 16_384 => 8_192,
             >= 12_288 => 6_144,
             >= 8_192 => 4_096,
             _ => 3_072
         };
-        var reservedForWindowsMb = totalRamMb.Value >= 12_288 ? 4_096 : 2_048;
-        var safeRamMb = Math.Max(2_048, totalRamMb.Value - reservedForWindowsMb);
-        var resolvedRamMb = Math.Clamp(Math.Min(requestedRamMb, Math.Min(recommendedRamMb, safeRamMb)), 2_048, requestedRamMb);
+        var safeAvailableRamMb = Math.Max(2_048, memory.AvailableMb - 1_024);
+        var resolvedRamMb = Math.Clamp(
+            Math.Min(requestedRamMb, Math.Min(recommendedRamMb, safeAvailableRamMb)),
+            2_048,
+            requestedRamMb);
 
         if (resolvedRamMb != requestedRamMb)
-            log?.Invoke($"RAM ajustada automaticamente: {requestedRamMb} MB -> {resolvedRamMb} MB ({totalRamMb.Value} MB fisicos detectados).");
+        {
+            log?.Invoke(
+                $"RAM ajustada automaticamente: {requestedRamMb} MB -> {resolvedRamMb} MB " +
+                $"({memory.TotalMb} MB fisicos, {memory.AvailableMb} MB livres).");
+        }
         else
-            log?.Invoke($"RAM do Minecraft: {resolvedRamMb} MB ({totalRamMb.Value} MB fisicos detectados).");
+        {
+            log?.Invoke($"RAM do Minecraft: {resolvedRamMb} MB ({memory.TotalMb} MB fisicos, {memory.AvailableMb} MB livres).");
+        }
 
         return resolvedRamMb;
     }
 
-    private static int? TryGetTotalPhysicalMemoryMb()
+    private static PhysicalMemoryInfo? TryGetPhysicalMemoryMb()
     {
         var status = new MemoryStatusEx();
         if (!GlobalMemoryStatusEx(status))
             return null;
 
-        return (int)Math.Max(1, status.TotalPhys / 1024 / 1024);
+        return new PhysicalMemoryInfo(
+            (int)Math.Max(1, status.TotalPhys / 1024 / 1024),
+            (int)Math.Max(1, status.AvailPhys / 1024 / 1024));
     }
+
+    private sealed record PhysicalMemoryInfo(int TotalMb, int AvailableMb);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatusEx lpBuffer);
@@ -265,10 +318,10 @@ internal static class LauncherRuntime
     private static void ConfigureMinecraftProcess(System.Diagnostics.Process process, Action<string>? log)
     {
         process.StartInfo.UseShellExecute = false;
-        process.StartInfo.CreateNoWindow = false;
+        process.StartInfo.CreateNoWindow = true;
         process.StartInfo.WindowStyle = ProcessWindowStyle.Normal;
-        process.StartInfo.RedirectStandardOutput = false;
-        process.StartInfo.RedirectStandardError = false;
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
 
         log?.Invoke($"Java: {Path.GetFileName(process.StartInfo.FileName)}");
     }
@@ -281,13 +334,19 @@ internal static class LauncherRuntime
         process.OutputDataReceived += (_, args) =>
         {
             if (!string.IsNullOrWhiteSpace(args.Data))
+            {
+                WriteMinecraftProcessLog(args.Data);
                 log?.Invoke($"Minecraft: {args.Data}");
+            }
         };
 
         process.ErrorDataReceived += (_, args) =>
         {
             if (!string.IsNullOrWhiteSpace(args.Data))
+            {
+                WriteMinecraftProcessLog(args.Data);
                 log?.Invoke($"Minecraft: {args.Data}");
+            }
         };
 
         try
@@ -299,6 +358,37 @@ internal static class LauncherRuntime
         {
             log?.Invoke("Nao foi possivel acompanhar a saida do Minecraft.");
         }
+    }
+
+    private static void WriteMinecraftProcessLog(string line)
+    {
+        try
+        {
+            File.AppendAllText(GetMinecraftProcessLogPath(), $"[{DateTime.Now:HH:mm:ss}] {line}{Environment.NewLine}", Encoding.UTF8);
+        }
+        catch
+        {
+            // Process output is useful for support, but should never block launching.
+        }
+    }
+
+    private static void ClearMinecraftProcessLog()
+    {
+        try
+        {
+            File.WriteAllText(GetMinecraftProcessLogPath(), "", Encoding.UTF8);
+        }
+        catch
+        {
+            // Diagnostics only.
+        }
+    }
+
+    private static string GetMinecraftProcessLogPath()
+    {
+        var diagnosticsDir = Path.GetDirectoryName(LauncherSettings.SettingsPath)!;
+        Directory.CreateDirectory(diagnosticsDir);
+        return Path.Combine(diagnosticsDir, "minecraft-process.log");
     }
 
     private static int StopStaleGameProcesses(string gameDir, Action<string>? log)
