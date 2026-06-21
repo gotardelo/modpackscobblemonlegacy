@@ -1,6 +1,12 @@
 {
   "items": [
     {
+      "title": "Launcher v1.2.0: diagnostico e suporte",
+      "message": "Nova tela de diagnostico, pacote ZIP de suporte, changelog completo e perfis de performance reais para PC fraco, equilibrado e alto desempenho.",
+      "url": "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/tag/launcher-v1.2.0",
+      "publishedAt": "2026-06-21T00:00:00-03:00"
+    },
+    {
       "title": "Launcher profissional em andamento",
       "message": "Agora o launcher tem auto-update, reparo de instalacao, relatorio de suporte e verificacao visual do pack.",
       "url": "https://discord.gg/sETS2Fc7Ey",

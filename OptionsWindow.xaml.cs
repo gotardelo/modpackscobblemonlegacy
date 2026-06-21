@@ -9,10 +9,12 @@ public partial class OptionsWindow : Window
 {
     public LauncherSettings Settings { get; }
     private bool isUpdatingRamControls;
+    private readonly string originalPerformanceProfile;
 
     public OptionsWindow(LauncherSettings settings)
     {
         Settings = settings.Clone();
+        originalPerformanceProfile = Settings.PerformanceProfile;
         InitializeComponent();
         ApplySettingsToUi();
     }
@@ -26,6 +28,7 @@ public partial class OptionsWindow : Window
         RamTextBox.Text = Settings.MaximumRamMb.ToString();
         RamSlider.Value = Settings.MaximumRamMb;
         CompatibilityModeCheckBox.IsChecked = Settings.CompatibilityMode;
+        PerformanceProfileComboBox.SelectedValue = Settings.PerformanceProfile;
         LauncherVisibilityComboBox.SelectedValue = Settings.LauncherVisibility;
         UseIntegratedJavaCheckBox.IsChecked = Settings.UseIntegratedJava;
         JavaPathTextBox.Text = Settings.JavaPath;
@@ -43,6 +46,8 @@ public partial class OptionsWindow : Window
             Settings.FullScreen = FullScreenCheckBox.IsChecked == true;
             Settings.MaximumRamMb = ReadInt(RamTextBox.Text, "RAM", 2048, 8192);
             Settings.CompatibilityMode = CompatibilityModeCheckBox.IsChecked == true;
+            Settings.PerformanceProfile = PerformanceProfileComboBox.SelectedValue as string
+                ?? PerformanceProfiles.Auto;
             Settings.LauncherVisibility = LauncherVisibilityComboBox.SelectedValue as string
                 ?? LauncherVisibilityModes.HideUntilGameExits;
             Settings.UseIntegratedJava = UseIntegratedJavaCheckBox.IsChecked == true;
@@ -51,6 +56,8 @@ public partial class OptionsWindow : Window
 
             ValidateGameDirectory(Settings.GameDirectory);
             ValidateJavaSettings(Settings);
+            if (!string.Equals(Settings.PerformanceProfile, originalPerformanceProfile, StringComparison.OrdinalIgnoreCase))
+                Settings.PerformancePresetVersion = 0;
 
             DialogResult = true;
         }
@@ -73,16 +80,19 @@ public partial class OptionsWindow : Window
     private void LowPresetButton_Click(object sender, RoutedEventArgs e)
     {
         ApplyPreset(854, 480, Math.Min(3072, LauncherRuntime.GetRecommendedMaximumRamMb()), compatibilityMode: true);
+        PerformanceProfileComboBox.SelectedValue = PerformanceProfiles.Low;
     }
 
     private void BalancedPresetButton_Click(object sender, RoutedEventArgs e)
     {
         ApplyPreset(1280, 720, LauncherRuntime.GetRecommendedMaximumRamMb(), compatibilityMode: false);
+        PerformanceProfileComboBox.SelectedValue = PerformanceProfiles.Balanced;
     }
 
     private void HighPresetButton_Click(object sender, RoutedEventArgs e)
     {
         ApplyPreset(1600, 900, Math.Max(4096, LauncherRuntime.GetRecommendedMaximumRamMb()), compatibilityMode: false);
+        PerformanceProfileComboBox.SelectedValue = PerformanceProfiles.High;
     }
 
     private void ApplyPreset(int width, int height, int ramMb, bool compatibilityMode)

@@ -26,8 +26,10 @@ Ao atualizar/jogar, o launcher tambem:
 - valida e repara bibliotecas do Fabric antes de iniciar o jogo.
 - verifica updates do proprio launcher na release publica do GitHub;
 - carrega avisos/noticias de `news.json`;
-- gera relatorio de suporte e abre o Discord;
+- abre uma tela de diagnostico com sistema, Java, pack, Fabric e logs;
+- gera pacote ZIP de suporte com logs e relatorio, e abre o Discord;
 - oferece botao `Reparar` para reinstalar Fabric e revalidar o pack sem apagar mundos.
+- aplica perfis de performance reais em `options.txt`: automatico, PC fraco, equilibrado e alto desempenho.
 
 ## Links uteis
 

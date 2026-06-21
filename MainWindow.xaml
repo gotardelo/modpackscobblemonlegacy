@@ -404,6 +404,11 @@
                             Margin="0,0,8,0"
                             Visibility="Collapsed"
                             Click="UpdateLauncherButton_Click" />
+                    <Button Content="Diagnostico"
+                            Style="{StaticResource TopOptionsButton}"
+                            Width="104"
+                            Margin="0,0,8,0"
+                            Click="DiagnosticsButton_Click" />
                     <Button Content="Opcoes"
                             Style="{StaticResource TopOptionsButton}"
                             Margin="0,0,8,0"
@@ -465,13 +470,22 @@
                                        Margin="0,5,0,8"
                                        MaxHeight="78"
                                        TextWrapping="Wrap" />
-                            <Button x:Name="NewsLinkButton"
-                                    Content="Abrir aviso"
-                                    Height="28"
-                                    Padding="10,0"
-                                    Style="{StaticResource FooterUtilityButton}"
-                                    Visibility="Collapsed"
-                                    Click="NewsLinkButton_Click" />
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="NewsAllButton"
+                                        Content="Ver avisos"
+                                        Height="28"
+                                        Padding="10,0"
+                                        Style="{StaticResource FooterUtilityButton}"
+                                        Click="NewsAllButton_Click" />
+                                <Button x:Name="NewsLinkButton"
+                                        Content="Abrir link"
+                                        Height="28"
+                                        Padding="10,0"
+                                        Margin="8,0,0,0"
+                                        Style="{StaticResource FooterUtilityButton}"
+                                        Visibility="Collapsed"
+                                        Click="NewsLinkButton_Click" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 

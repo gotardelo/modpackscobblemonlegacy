@@ -178,31 +178,41 @@ internal static class LauncherNewsService
 
     public static async Task<LauncherNewsItem?> LoadLatestAsync(HttpClient http, JsonSerializerOptions jsonOptions)
     {
+        var feed = await LoadFeedAsync(http, jsonOptions);
+        return feed.Items
+            .Where(item => !string.IsNullOrWhiteSpace(item.Title) || !string.IsNullOrWhiteSpace(item.Message))
+            .OrderByDescending(item => item.PublishedAt)
+            .FirstOrDefault();
+    }
+
+    public static async Task<LauncherNewsFeed> LoadFeedAsync(HttpClient http, JsonSerializerOptions jsonOptions)
+    {
         try
         {
             using var stream = await http.GetStreamAsync(ProgramDefaults.NewsUrl);
             using var reader = new StreamReader(stream, Encoding.UTF8);
             var json = await reader.ReadToEndAsync();
             await SaveCacheAsync(json);
-            return ParseLatest(json, jsonOptions);
+            return ParseFeed(json, jsonOptions);
         }
         catch
         {
             if (!File.Exists(CachePath))
-                return null;
+                return new LauncherNewsFeed();
 
             var cachedJson = await File.ReadAllTextAsync(CachePath, Encoding.UTF8);
-            return ParseLatest(cachedJson, jsonOptions);
+            return ParseFeed(cachedJson, jsonOptions);
         }
     }
 
-    private static LauncherNewsItem? ParseLatest(string json, JsonSerializerOptions jsonOptions)
+    private static LauncherNewsFeed ParseFeed(string json, JsonSerializerOptions jsonOptions)
     {
-        var feed = JsonSerializer.Deserialize<LauncherNewsFeed>(json, jsonOptions);
-        return feed?.Items
+        var feed = JsonSerializer.Deserialize<LauncherNewsFeed>(json, jsonOptions) ?? new LauncherNewsFeed();
+        feed.Items = feed.Items
             .Where(item => !string.IsNullOrWhiteSpace(item.Title) || !string.IsNullOrWhiteSpace(item.Message))
             .OrderByDescending(item => item.PublishedAt)
-            .FirstOrDefault();
+            .ToList();
+        return feed;
     }
 
     private static async Task SaveCacheAsync(string json)
@@ -219,12 +229,12 @@ internal static class LauncherNewsService
     }
 }
 
-internal sealed class LauncherNewsFeed
+public sealed class LauncherNewsFeed
 {
     public List<LauncherNewsItem> Items { get; set; } = [];
 }
 
-internal sealed class LauncherNewsItem
+public sealed class LauncherNewsItem
 {
     public string Title { get; set; } = "";
     public string Message { get; set; } = "";

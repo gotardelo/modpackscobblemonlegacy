@@ -7,7 +7,7 @@ namespace CobblemonLegacy;
 
 internal static class MinecraftProfileConfigurator
 {
-    private const int CurrentPerformancePresetVersion = 2;
+    private const int CurrentPerformancePresetVersion = 3;
 
     public static async Task ConfigureAsync(
         string gameDir,
@@ -85,8 +85,7 @@ internal static class MinecraftProfileConfigurator
                 order.Add(key);
         }
 
-        var tier = LauncherRuntime.GetPerformanceTier();
-        var preset = PerformancePreset.ForTier(tier);
+        var preset = PerformancePreset.ForProfile(settings.PerformanceProfile, LauncherRuntime.GetPerformanceTier());
 
         SetOption(map, order, "graphicsMode", "0");
         SetOption(map, order, "renderDistance", preset.RenderDistance.ToString());
@@ -127,13 +126,19 @@ internal static class MinecraftProfileConfigurator
         int BiomeBlendRadius,
         int MaxFps)
     {
-        public static PerformancePreset ForTier(PerformanceTier tier)
+        public static PerformancePreset ForProfile(string profile, PerformanceTier detectedTier)
         {
-            return tier switch
+            return profile switch
             {
-                PerformanceTier.LowEnd => new PerformancePreset("leve", 5, 4, 0, 2, "0.5", 0, 45),
-                PerformanceTier.Balanced => new PerformancePreset("equilibrado", 6, 4, 1, 1, "0.65", 0, 60),
-                _ => new PerformancePreset("padrao", 8, 5, 2, 1, "0.75", 1, 90)
+                PerformanceProfiles.Low => new PerformancePreset("PC fraco", 5, 4, 0, 2, "0.5", 0, 45),
+                PerformanceProfiles.Balanced => new PerformancePreset("equilibrado", 7, 5, 1, 1, "0.7", 0, 60),
+                PerformanceProfiles.High => new PerformancePreset("alto desempenho", 10, 6, 2, 0, "0.9", 1, 120),
+                _ => detectedTier switch
+                {
+                    PerformanceTier.LowEnd => new PerformancePreset("automatico leve", 5, 4, 0, 2, "0.5", 0, 45),
+                    PerformanceTier.Balanced => new PerformancePreset("automatico equilibrado", 6, 4, 1, 1, "0.65", 0, 60),
+                    _ => new PerformancePreset("automatico padrao", 8, 5, 2, 1, "0.75", 1, 90)
+                }
             };
         }
     }

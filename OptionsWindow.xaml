@@ -189,6 +189,22 @@
                                 Click="HighPresetButton_Click" />
                     </Grid>
 
+                    <TextBlock Text="Perfil de performance"
+                               Style="{StaticResource FieldLabel}" />
+                    <ComboBox x:Name="PerformanceProfileComboBox"
+                              SelectedValuePath="Tag">
+                        <ComboBoxItem Content="Automatico pelo PC"
+                                      Tag="auto" />
+                        <ComboBoxItem Content="PC fraco"
+                                      Tag="low" />
+                        <ComboBoxItem Content="Equilibrado"
+                                      Tag="balanced" />
+                        <ComboBoxItem Content="Alto desempenho"
+                                      Tag="high" />
+                    </ComboBox>
+                    <TextBlock Text="Esse perfil ajusta graficos, distancia de renderizacao, particulas e FPS na proxima preparacao do jogo."
+                               Style="{StaticResource HintText}" />
+
                     <TextBlock Text="Resolucao"
                                Style="{StaticResource FieldLabel}"
                                Margin="0,4,0,7" />

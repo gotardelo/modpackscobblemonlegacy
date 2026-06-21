@@ -17,9 +17,12 @@ Use este checklist antes de mandar uma nova versao para os players.
 - Fechar e abrir o launcher para confirmar que o nickname ficou salvo.
 - Login Microsoft iniciado e cancelado sem erro fatal.
 - Botao `Opcoes` abre e salva RAM/resolucao.
+- Botao `Diagnostico` abre e mostra sistema, memoria, Java, Fabric e pack.
+- Botao `Gerar ZIP` no diagnostico cria pacote de suporte.
 - Preset `PC fraco` salva corretamente.
 - Preset `Equilibrado` salva corretamente.
 - Preset `Alto desempenho` salva corretamente.
+- Conferir que o perfil escolhido aplica preset no `options.txt` apos preparar o jogo.
 - Botao `Relatorio` gera arquivo, copia texto e abre Discord.
 - Botao `Reparar` reinstala Fabric e revalida o pack sem apagar mundos.
 - Botao `Atualizar` aparece quando existir release nova.

@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private MSession? microsoftSession;
     private LauncherUpdateInfo? availableUpdate;
     private LauncherNewsItem? currentNews;
+    private LauncherNewsFeed? newsFeed;
     private LauncherPrimaryAction primaryAction = LauncherPrimaryAction.Hidden;
     private bool isBusy;
     private bool isClosing;
@@ -686,19 +687,39 @@ public partial class MainWindow : Window
     {
         try
         {
-            var report = await LauncherRuntime.CreateCrashReportAsync(
+            var package = await LauncherRuntime.CreateSupportPackageAsync(
                 settings,
                 LogTextBox.Text,
                 StatusText.Text);
 
-            Clipboard.SetText(report.Text);
-            OpenFileLocation(report.Path);
+            Clipboard.SetText(package.Text);
+            OpenFileLocation(package.ZipPath);
             OpenExternalUrl("https://discord.gg/sETS2Fc7Ey");
-            SetStatus("Relatorio copiado e Discord aberto para enviar ao suporte.");
+            SetStatus("Pacote ZIP criado, relatorio copiado e Discord aberto para suporte.");
         }
         catch (Exception ex)
         {
             ShowError($"Nao foi possivel gerar o relatorio: {ex.Message}");
+        }
+    }
+
+    private async void DiagnosticsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var snapshot = await LauncherRuntime.CreateDiagnosticsSnapshotAsync(settings, manifest, StatusText.Text);
+            var dialog = new DiagnosticsWindow(
+                snapshot,
+                () => LauncherRuntime.CreateSupportPackageAsync(settings, LogTextBox.Text, StatusText.Text))
+            {
+                Owner = this
+            };
+
+            dialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Nao foi possivel abrir o diagnostico: {ex.Message}");
         }
     }
 
@@ -756,7 +777,7 @@ public partial class MainWindow : Window
 
         var result = MessageBox.Show(
             this,
-            $"Existe uma nova versao do launcher: {availableUpdate.Version}. Baixar e abrir o instalador agora?",
+            BuildUpdatePrompt(availableUpdate),
             "Cobblemon Legacy",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
@@ -792,6 +813,39 @@ public partial class MainWindow : Window
     {
         if (!string.IsNullOrWhiteSpace(currentNews?.Url))
             OpenExternalUrl(currentNews.Url);
+    }
+
+    private static string BuildUpdatePrompt(LauncherUpdateInfo update)
+    {
+        var builder = new StringBuilder()
+            .AppendLine($"Nova versao disponivel: {update.Version}")
+            .AppendLine($"Tamanho: {LauncherRuntime.FormatBytes(update.Size)}")
+            .AppendLine()
+            .AppendLine("Baixar e abrir o instalador agora?");
+
+        var notes = (update.Body ?? "").Trim();
+        if (!string.IsNullOrWhiteSpace(notes))
+        {
+            if (notes.Length > 600)
+                notes = $"{notes[..600]}...";
+
+            builder
+                .AppendLine()
+                .AppendLine("Notas:")
+                .AppendLine(notes);
+        }
+
+        return builder.ToString();
+    }
+
+    private void NewsAllButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new NewsWindow(newsFeed ?? new LauncherNewsFeed())
+        {
+            Owner = this
+        };
+
+        dialog.ShowDialog();
     }
 
     private void OpenFileLocation(string path)
@@ -863,10 +917,12 @@ public partial class MainWindow : Window
     {
         try
         {
-            var news = await LauncherNewsService.LoadLatestAsync(http, LauncherRuntime.JsonOptions);
+            var feed = await LauncherNewsService.LoadFeedAsync(http, LauncherRuntime.JsonOptions);
+            var news = feed.Items.FirstOrDefault();
             if (cancellationToken.IsCancellationRequested || news is null)
                 return;
 
+            newsFeed = feed;
             currentNews = news;
             Dispatcher.Invoke(() => ApplyNewsToUi(news));
         }

@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.1.0";
+    public const string LauncherVersion = "1.2.0";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -667,6 +667,121 @@ internal static class LauncherRuntime
         return new CrashReportResult(reportPath, report.ToString());
     }
 
+    public static async Task<SupportPackageResult> CreateSupportPackageAsync(
+        LauncherSettings? settings,
+        string visibleLog,
+        string lastStatus)
+    {
+        var report = await CreateCrashReportAsync(settings, visibleLog, lastStatus);
+        var diagnosticsDir = Path.GetDirectoryName(LauncherSettings.SettingsPath)!;
+        var reportsDir = Path.Combine(diagnosticsDir, "crash-reports");
+        var gameDir = settings is null
+            ? Path.GetFullPath(Environment.ExpandEnvironmentVariables("%APPDATA%\\.cobblemonlegacy"))
+            : ExpandGameDirectory(settings);
+        var zipPath = Path.Combine(reportsDir, $"CobblemonLegacy-Support-{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+
+        using (var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+        {
+            AddFileToArchiveIfExists(archive, report.Path, "CobblemonLegacy-Report.txt");
+            AddFileToArchiveIfExists(archive, LauncherSettings.SettingsPath, "launcher/launcher.settings.json");
+            AddFileToArchiveIfExists(archive, Path.Combine(diagnosticsDir, "launcher-ui.log"), "launcher/launcher-ui.log");
+            AddFileToArchiveIfExists(archive, Path.Combine(diagnosticsDir, "launcher.log"), "launcher/launcher.log");
+            AddFileToArchiveIfExists(archive, Path.Combine(diagnosticsDir, "minecraft-process.log"), "launcher/minecraft-process.log");
+            AddFileToArchiveIfExists(archive, Path.Combine(diagnosticsDir, "last-launch-command.txt"), "launcher/last-launch-command.txt");
+            AddFileToArchiveIfExists(archive, ModpackManifestLoader.CachePath, "launcher/manifest-cache.json");
+            AddFileToArchiveIfExists(archive, Path.Combine(gameDir, "logs", "latest.log"), "minecraft/latest.log");
+
+            var latestCrash = FindNewestFile(Path.Combine(gameDir, "crash-reports"), "crash-*.txt");
+            AddFileToArchiveIfExists(archive, latestCrash, "minecraft/latest-crash-report.txt");
+
+            var latestJavaCrash = FindNewestJavaCrashLog(gameDir);
+            AddFileToArchiveIfExists(archive, latestJavaCrash, "minecraft/latest-java-crash.log");
+        }
+
+        return new SupportPackageResult(report.Path, zipPath, report.Text);
+    }
+
+    public static async Task<DiagnosticsSnapshot> CreateDiagnosticsSnapshotAsync(
+        LauncherSettings? settings,
+        ModpackManifest? manifest,
+        string lastStatus)
+    {
+        var items = new List<DiagnosticItem>();
+        var memory = TryGetPhysicalMemoryMb();
+        var gameDir = settings is null
+            ? Path.GetFullPath(Environment.ExpandEnvironmentVariables("%APPDATA%\\.cobblemonlegacy"))
+            : ExpandGameDirectory(settings);
+
+        AddDiagnostic(items, "Launcher", LauncherVersion, DiagnosticState.Ok);
+        AddDiagnostic(items, "Servidor", ServerIp, DiagnosticState.Ok);
+        AddDiagnostic(items, "Windows", Environment.OSVersion.ToString(), DiagnosticState.Ok);
+        AddDiagnostic(items, ".NET", Environment.Version.ToString(), DiagnosticState.Ok);
+        AddDiagnostic(items, "Sistema 64-bit", Environment.Is64BitOperatingSystem ? "Sim" : "Nao", Environment.Is64BitOperatingSystem ? DiagnosticState.Ok : DiagnosticState.Warning);
+        AddDiagnostic(items, "Processo 64-bit", Environment.Is64BitProcess ? "Sim" : "Nao", Environment.Is64BitProcess ? DiagnosticState.Ok : DiagnosticState.Warning);
+        AddDiagnostic(items, "Memoria fisica", memory is null ? "Desconhecida" : $"{memory.TotalMb} MB total / {memory.AvailableMb} MB livre", memory is null ? DiagnosticState.Warning : DiagnosticState.Ok);
+        AddDiagnostic(items, "Pasta do jogo", gameDir, Directory.Exists(gameDir) ? DiagnosticState.Ok : DiagnosticState.Warning);
+        AddDiagnostic(items, "Configuracoes", LauncherSettings.SettingsPath, File.Exists(LauncherSettings.SettingsPath) ? DiagnosticState.Ok : DiagnosticState.Warning);
+        AddDiagnostic(items, "Perfil", settings?.AuthMode switch
+        {
+            AuthModes.Microsoft => string.IsNullOrWhiteSpace(settings.MicrosoftUsername) ? "Microsoft pendente" : $"Microsoft: {settings.MicrosoftUsername}",
+            AuthModes.Offline => $"Offline: {settings.OfflineUsername}",
+            _ => "Nao escolhido"
+        }, string.IsNullOrWhiteSpace(settings?.AuthMode) ? DiagnosticState.Warning : DiagnosticState.Ok);
+        AddDiagnostic(items, "RAM configurada", settings is null ? "Desconhecida" : $"{settings.MaximumRamMb} MB", DiagnosticState.Ok);
+        AddDiagnostic(items, "Modo desempenho", settings?.PerformanceProfile ?? PerformanceProfiles.Auto, DiagnosticState.Ok);
+        AddDiagnostic(items, "Java", settings is null || settings.UseIntegratedJava ? "Runtime integrado" : settings.JavaPath, settings is not null && !settings.UseIntegratedJava && !File.Exists(settings.JavaPath) ? DiagnosticState.Error : DiagnosticState.Ok);
+        AddDiagnostic(items, "Manifest", manifest is null ? "Nao carregado" : $"{manifest.Version} / {manifest.Files.Count} arquivos", manifest is null ? DiagnosticState.Warning : DiagnosticState.Ok);
+
+        if (settings is not null && manifest is not null)
+        {
+            try
+            {
+                var readiness = await CheckPackReadinessAsync(gameDir, manifest, JsonOptions);
+                AddDiagnostic(items, "Integridade do pack", readiness.Message, readiness.IsReady ? DiagnosticState.Ok : DiagnosticState.Warning);
+
+                var fabricVersion = FabricProfileInstaller.FindInstalledVersionId(gameDir, manifest.MinecraftVersion, manifest.FabricLoaderVersion);
+                if (fabricVersion is null)
+                {
+                    AddDiagnostic(items, "Fabric", "Nao instalado", DiagnosticState.Warning);
+                }
+                else
+                {
+                    var librariesOk = await FabricProfileInstaller.HasRequiredLibrariesAsync(gameDir, fabricVersion);
+                    AddDiagnostic(items, "Fabric", $"{fabricVersion} / bibliotecas {(librariesOk ? "ok" : "com problema")}", librariesOk ? DiagnosticState.Ok : DiagnosticState.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                AddDiagnostic(items, "Integridade do pack", ex.Message, DiagnosticState.Error);
+            }
+        }
+
+        AddDiagnostic(items, "Ultimo latest.log", Path.Combine(gameDir, "logs", "latest.log"), File.Exists(Path.Combine(gameDir, "logs", "latest.log")) ? DiagnosticState.Ok : DiagnosticState.Warning);
+        AddDiagnostic(items, "Ultimo status", lastStatus, DiagnosticState.Ok);
+
+        return new DiagnosticsSnapshot(DateTimeOffset.Now, items);
+    }
+
+    private static void AddDiagnostic(List<DiagnosticItem> items, string name, string value, DiagnosticState state)
+    {
+        items.Add(new DiagnosticItem(name, value, state));
+    }
+
+    private static void AddFileToArchiveIfExists(ZipArchive archive, string? sourcePath, string entryName)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+            return;
+
+        try
+        {
+            archive.CreateEntryFromFile(sourcePath, entryName, CompressionLevel.Fastest);
+        }
+        catch
+        {
+            // A support package should still be useful even if one log is locked.
+        }
+    }
+
     private static void AppendReportHeader(StringBuilder report, LauncherSettings? settings, string gameDir, string lastStatus)
     {
         var memory = TryGetPhysicalMemoryMb();
@@ -689,6 +804,7 @@ internal static class LauncherRuntime
         report.AppendLine($"Tela cheia: {settings?.FullScreen.ToString() ?? "desconhecido"}");
         report.AppendLine($"Visibilidade launcher: {settings?.LauncherVisibility ?? "desconhecida"}");
         report.AppendLine($"Modo compatibilidade: {settings?.CompatibilityMode.ToString() ?? "desconhecido"}");
+        report.AppendLine($"Perfil performance: {settings?.PerformanceProfile ?? PerformanceProfiles.Auto}");
         report.AppendLine($"Java integrado: {settings?.UseIntegratedJava.ToString() ?? "desconhecido"}");
         report.AppendLine($"Java customizado: {settings?.JavaPath ?? ""}");
         report.AppendLine($"JVM extra: {settings?.ExtraJvmArguments ?? ""}");
@@ -773,6 +889,19 @@ internal static class LauncherRuntime
 
 internal sealed record CrashReportResult(string Path, string Text);
 
+public sealed record SupportPackageResult(string ReportPath, string ZipPath, string Text);
+
+public sealed record DiagnosticsSnapshot(DateTimeOffset CreatedAt, IReadOnlyList<DiagnosticItem> Items);
+
+public sealed record DiagnosticItem(string Name, string Value, DiagnosticState State);
+
+public enum DiagnosticState
+{
+    Ok,
+    Warning,
+    Error
+}
+
 internal enum PerformanceTier
 {
     LowEnd,
@@ -791,6 +920,14 @@ internal static class LauncherVisibilityModes
     public const string HideUntilGameExits = "hide";
     public const string MinimizeUntilGameExits = "minimize";
     public const string KeepOpen = "keep-open";
+}
+
+internal static class PerformanceProfiles
+{
+    public const string Auto = "auto";
+    public const string Low = "low";
+    public const string Balanced = "balanced";
+    public const string High = "high";
 }
 
 public sealed class LauncherSettings
@@ -813,6 +950,7 @@ public sealed class LauncherSettings
     public bool FullScreen { get; set; }
     public string LauncherVisibility { get; set; } = LauncherVisibilityModes.HideUntilGameExits;
     public bool CompatibilityMode { get; set; }
+    public string PerformanceProfile { get; set; } = PerformanceProfiles.Auto;
     public bool UseIntegratedJava { get; set; } = true;
     public string JavaPath { get; set; } = "";
     public string ExtraJvmArguments { get; set; } = "";
@@ -833,6 +971,7 @@ public sealed class LauncherSettings
             FullScreen = FullScreen,
             LauncherVisibility = LauncherVisibility,
             CompatibilityMode = CompatibilityMode,
+            PerformanceProfile = PerformanceProfile,
             UseIntegratedJava = UseIntegratedJava,
             JavaPath = JavaPath,
             ExtraJvmArguments = ExtraJvmArguments,
@@ -853,6 +992,7 @@ public sealed class LauncherSettings
         FullScreen = source.FullScreen;
         LauncherVisibility = source.LauncherVisibility;
         CompatibilityMode = source.CompatibilityMode;
+        PerformanceProfile = source.PerformanceProfile;
         UseIntegratedJava = source.UseIntegratedJava;
         JavaPath = source.JavaPath;
         ExtraJvmArguments = source.ExtraJvmArguments;
@@ -925,6 +1065,7 @@ public sealed class LauncherSettings
         WindowWidth = Math.Clamp(WindowWidth <= 0 ? 854 : WindowWidth, 640, 3840);
         WindowHeight = Math.Clamp(WindowHeight <= 0 ? 480 : WindowHeight, 360, 2160);
         LauncherVisibility = NormalizeLauncherVisibility(LauncherVisibility);
+        PerformanceProfile = NormalizePerformanceProfile(PerformanceProfile);
         JavaPath = JavaPath?.Trim() ?? "";
         ExtraJvmArguments = ExtraJvmArguments?.Trim() ?? "";
 
@@ -950,6 +1091,17 @@ public sealed class LauncherSettings
             LauncherVisibilityModes.MinimizeUntilGameExits => LauncherVisibilityModes.MinimizeUntilGameExits,
             LauncherVisibilityModes.KeepOpen => LauncherVisibilityModes.KeepOpen,
             _ => LauncherVisibilityModes.HideUntilGameExits
+        };
+    }
+
+    private static string NormalizePerformanceProfile(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            PerformanceProfiles.Low => PerformanceProfiles.Low,
+            PerformanceProfiles.Balanced => PerformanceProfiles.Balanced,
+            PerformanceProfiles.High => PerformanceProfiles.High,
+            _ => PerformanceProfiles.Auto
         };
     }
 }

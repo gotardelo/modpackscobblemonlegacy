@@ -19,9 +19,10 @@ Confira se o download veio do link oficial e compare o SHA256 publicado na relea
 ## Se o jogo nao abrir
 
 1. Abra o launcher.
-2. Clique em `Relatorio`.
-3. Envie o arquivo gerado no Discord.
-4. Se quiser tentar resolver sozinho, clique em `Reparar`.
+2. Clique em `Diagnostico` para conferir o estado do launcher.
+3. Clique em `Gerar ZIP` ou use `Relatorio`.
+4. Envie o arquivo `.zip` gerado no Discord.
+5. Se quiser tentar resolver sozinho, clique em `Reparar`.
 
 O botao `Reparar` reinstala partes quebradas do Fabric e revalida o pack. Ele nao apaga mundos.
 
@@ -29,7 +30,7 @@ O botao `Reparar` reinstala partes quebradas do Fabric e revalida o pack. Ele na
 
 Abra `Opcoes` e clique em `PC fraco`.
 
-Esse preset reduz resolucao inicial, RAM e ativa modo de compatibilidade.
+Esse preset reduz resolucao inicial, RAM, ativa modo de compatibilidade e aplica configuracoes mais leves dentro do Minecraft na proxima preparacao do jogo.
 
 ## Links
 
