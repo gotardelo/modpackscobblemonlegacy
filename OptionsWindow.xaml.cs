@@ -8,6 +8,7 @@ namespace CobblemonLegacy;
 public partial class OptionsWindow : Window
 {
     public LauncherSettings Settings { get; }
+    private bool isUpdatingRamControls;
 
     public OptionsWindow(LauncherSettings settings)
     {
@@ -23,6 +24,7 @@ public partial class OptionsWindow : Window
         WindowHeightTextBox.Text = Settings.WindowHeight.ToString();
         FullScreenCheckBox.IsChecked = Settings.FullScreen;
         RamTextBox.Text = Settings.MaximumRamMb.ToString();
+        RamSlider.Value = Settings.MaximumRamMb;
         CompatibilityModeCheckBox.IsChecked = Settings.CompatibilityMode;
         LauncherVisibilityComboBox.SelectedValue = Settings.LauncherVisibility;
         UseIntegratedJavaCheckBox.IsChecked = Settings.UseIntegratedJava;
@@ -65,7 +67,54 @@ public partial class OptionsWindow : Window
 
     private void AutoRamButton_Click(object sender, RoutedEventArgs e)
     {
-        RamTextBox.Text = LauncherRuntime.GetRecommendedMaximumRamMb().ToString();
+        SetRamValue(LauncherRuntime.GetRecommendedMaximumRamMb());
+    }
+
+    private void LowPresetButton_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyPreset(854, 480, Math.Min(3072, LauncherRuntime.GetRecommendedMaximumRamMb()), compatibilityMode: true);
+    }
+
+    private void BalancedPresetButton_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyPreset(1280, 720, LauncherRuntime.GetRecommendedMaximumRamMb(), compatibilityMode: false);
+    }
+
+    private void HighPresetButton_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyPreset(1600, 900, Math.Max(4096, LauncherRuntime.GetRecommendedMaximumRamMb()), compatibilityMode: false);
+    }
+
+    private void ApplyPreset(int width, int height, int ramMb, bool compatibilityMode)
+    {
+        WindowWidthTextBox.Text = width.ToString();
+        WindowHeightTextBox.Text = height.ToString();
+        FullScreenCheckBox.IsChecked = false;
+        CompatibilityModeCheckBox.IsChecked = compatibilityMode;
+        SetRamValue(Math.Clamp(ramMb, 2048, 8192));
+    }
+
+    private void RamSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (isUpdatingRamControls || RamTextBox is null)
+            return;
+
+        RamTextBox.Text = ((int)e.NewValue).ToString();
+    }
+
+    private void SetRamValue(int ramMb)
+    {
+        isUpdatingRamControls = true;
+        try
+        {
+            var value = Math.Clamp(ramMb, 2048, 8192);
+            RamTextBox.Text = value.ToString();
+            RamSlider.Value = value;
+        }
+        finally
+        {
+            isUpdatingRamControls = false;
+        }
     }
 
     private void UseIntegratedJavaCheckBox_Click(object sender, RoutedEventArgs e)

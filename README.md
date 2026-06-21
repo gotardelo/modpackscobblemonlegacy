@@ -24,6 +24,17 @@ Ao atualizar/jogar, o launcher tambem:
 - aplica um preset inicial/adaptativo de performance mais leve em `options.txt`;
 - ajusta RAM e downloads paralelos conforme o PC do jogador;
 - valida e repara bibliotecas do Fabric antes de iniciar o jogo.
+- verifica updates do proprio launcher na release publica do GitHub;
+- carrega avisos/noticias de `news.json`;
+- gera relatorio de suporte e abre o Discord;
+- oferece botao `Reparar` para reinstalar Fabric e revalidar o pack sem apagar mundos.
+
+## Links uteis
+
+- Guia para players: [`docs/PLAYER_GUIDE.md`](docs/PLAYER_GUIDE.md)
+- Checklist de testes: [`docs/QA_CHECKLIST.md`](docs/QA_CHECKLIST.md)
+- Pagina de download: [`docs/download.html`](docs/download.html)
+- Relatorio de seguranca: [`SECURITY_SCAN_REPORT.md`](SECURITY_SCAN_REPORT.md)
 
 ## Manifest do modpack
 
@@ -34,6 +45,12 @@ https://raw.githubusercontent.com/gotardelo/cobblemonlegacy-downloads/main/manif
 ```
 
 Se nao conseguir baixar, ele usa o `manifest.json` local do projeto/executavel.
+
+Os avisos do launcher usam:
+
+```txt
+https://raw.githubusercontent.com/gotardelo/cobblemonlegacy-downloads/main/news.json
+```
 
 Para preparar os arquivos do pack:
 

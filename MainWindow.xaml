@@ -48,6 +48,12 @@
             <Setter Property="BorderBrush" Value="#6AD9F6" />
         </Style>
 
+        <Style x:Key="TopUpdateButton" TargetType="Button" BasedOn="{StaticResource TopOptionsButton}">
+            <Setter Property="Width" Value="126" />
+            <Setter Property="Background" Value="#9A0A3A2F" />
+            <Setter Property="BorderBrush" Value="#75FFD36A" />
+        </Style>
+
         <Style x:Key="LoginOptionButton" TargetType="Button">
             <Setter Property="Height" Value="50" />
             <Setter Property="Padding" Value="18,0" />
@@ -392,6 +398,12 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"
                             Margin="0,6,8,0">
+                    <Button x:Name="UpdateLauncherButton"
+                            Content="Atualizar"
+                            Style="{StaticResource TopUpdateButton}"
+                            Margin="0,0,8,0"
+                            Visibility="Collapsed"
+                            Click="UpdateLauncherButton_Click" />
                     <Button Content="Opcoes"
                             Style="{StaticResource TopOptionsButton}"
                             Margin="0,0,8,0"
@@ -410,6 +422,58 @@
                         <ColumnDefinition Width="430" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
+
+                    <Border x:Name="NewsPanel"
+                            Grid.Column="0"
+                            Width="250"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,20,0"
+                            Padding="14,12"
+                            CornerRadius="7"
+                            BorderBrush="#4A77A7C4"
+                            BorderThickness="1"
+                            Visibility="Collapsed">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#AD061018" Offset="0" />
+                                <GradientStop Color="#D0091724" Offset="0.62" />
+                                <GradientStop Color="#9A06303A" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000"
+                                              BlurRadius="22"
+                                              ShadowDepth="5"
+                                              Opacity="0.58" />
+                        </Border.Effect>
+                        <StackPanel>
+                            <TextBlock Text="AVISOS"
+                                       Foreground="{StaticResource CyanBrush}"
+                                       FontSize="11"
+                                       FontWeight="Black" />
+                            <TextBlock x:Name="NewsTitleText"
+                                       Foreground="#FFFFFF"
+                                       FontSize="15"
+                                       FontWeight="Black"
+                                       Margin="0,5,0,0"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="NewsBodyText"
+                                       Foreground="#C9DCE8"
+                                       FontSize="12"
+                                       LineHeight="15"
+                                       Margin="0,5,0,8"
+                                       MaxHeight="78"
+                                       TextWrapping="Wrap" />
+                            <Button x:Name="NewsLinkButton"
+                                    Content="Abrir aviso"
+                                    Height="28"
+                                    Padding="10,0"
+                                    Style="{StaticResource FooterUtilityButton}"
+                                    Visibility="Collapsed"
+                                    Click="NewsLinkButton_Click" />
+                        </StackPanel>
+                    </Border>
 
                     <Border Grid.Column="1"
                             Width="430"
@@ -562,6 +626,14 @@
                                        TextAlignment="Center"
                                        FontSize="13"
                                        Margin="0,6,0,0" />
+                            <TextBlock x:Name="IntegrityText"
+                                       Text="Integridade: aguardando..."
+                                       Foreground="#8EDAF0"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -570,7 +642,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="356" />
+                        <ColumnDefinition Width="442" />
                     </Grid.ColumnDefinitions>
 
                     <Border CornerRadius="7"
@@ -718,6 +790,12 @@
                                         MinWidth="0"
                                         Style="{StaticResource FooterLinkButton}"
                                         Click="OptionsButton_Click" />
+                                <Button Content="Reparar"
+                                        Width="78"
+                                        MinWidth="0"
+                                        Style="{StaticResource FooterLinkButton}"
+                                        Margin="8,0,0,0"
+                                        Click="RepairButton_Click" />
                                 <Button Content="Relatorio"
                                         Width="78"
                                         MinWidth="0"

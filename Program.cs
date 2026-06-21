@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.0.9";
+    public const string LauncherVersion = "1.1.0";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -126,6 +126,26 @@ internal static class LauncherRuntime
         return fabricVersionId;
     }
 
+    public static async Task<string> RepairInstallationAsync(
+        HttpClient http,
+        MinecraftLauncher launcher,
+        ModpackManifest manifest,
+        string gameDir,
+        Action<string>? log = null,
+        Action<long, long>? byteProgress = null)
+    {
+        Directory.CreateDirectory(gameDir);
+        log?.Invoke("Modo reparo iniciado. Seus mundos e configuracoes pessoais serao preservados.");
+
+        ResetManagedPackState(gameDir, log);
+        RemoveFabricInstall(gameDir, manifest.MinecraftVersion, log);
+        ClearMinecraftProcessLog();
+
+        var versionId = await InstallOrUpdateAsync(http, launcher, manifest, gameDir, log, byteProgress);
+        log?.Invoke("Reparo concluido.");
+        return versionId;
+    }
+
     public static async Task<PackReadiness> CheckPackReadinessAsync(
         string gameDir,
         ModpackManifest manifest,
@@ -150,6 +170,42 @@ internal static class LauncherRuntime
     private static bool IsVersionInstalled(string gameDir, string versionId)
     {
         return File.Exists(Path.Combine(gameDir, "versions", versionId, $"{versionId}.json"));
+    }
+
+    private static void ResetManagedPackState(string gameDir, Action<string>? log)
+    {
+        var statePath = Path.Combine(gameDir, ManagedFileSynchronizer.StateFileName);
+        if (File.Exists(statePath))
+        {
+            File.Delete(statePath);
+            log?.Invoke("Estado do pack resetado para nova verificacao completa.");
+        }
+    }
+
+    private static void RemoveFabricInstall(string gameDir, string minecraftVersion, Action<string>? log)
+    {
+        var versionsDir = Path.Combine(gameDir, "versions");
+        if (Directory.Exists(versionsDir))
+        {
+            foreach (var directory in Directory.EnumerateDirectories(versionsDir, $"fabric-loader-*-{minecraftVersion}"))
+                DeleteDirectoryInsideGameDir(gameDir, directory, log);
+        }
+
+        DeleteDirectoryInsideGameDir(gameDir, Path.Combine(gameDir, "libraries", "net", "fabricmc"), log);
+    }
+
+    private static void DeleteDirectoryInsideGameDir(string gameDir, string directory, Action<string>? log)
+    {
+        if (!Directory.Exists(directory))
+            return;
+
+        var root = Path.GetFullPath(gameDir);
+        var fullDirectory = Path.GetFullPath(directory);
+        if (!IsInsideDirectory(fullDirectory, root))
+            throw new InvalidOperationException($"Reparo bloqueado fora da pasta do jogo: {fullDirectory}");
+
+        Directory.Delete(fullDirectory, recursive: true);
+        log?.Invoke($"Reparo removeu cache: {Path.GetRelativePath(root, fullDirectory)}");
     }
 
     public static async Task<System.Diagnostics.Process> StartGameAsync(
@@ -901,6 +957,7 @@ public sealed class LauncherSettings
 internal static class ProgramDefaults
 {
     public const string ManifestUrl = "https://raw.githubusercontent.com/gotardelo/cobblemonlegacy-downloads/main/manifest.json";
+    public const string NewsUrl = "https://raw.githubusercontent.com/gotardelo/cobblemonlegacy-downloads/main/news.json";
     public const string FabricMetaBaseUrl = "https://meta.fabricmc.net/v2";
 
     public static bool IsLegacyManifestUrl(string value)
@@ -1369,7 +1426,7 @@ internal static class FabricProfileInstaller
 
 internal static class ManagedFileSynchronizer
 {
-    private const string StateFileName = ".cobblemonlegacy-launcher-state.json";
+    public const string StateFileName = ".cobblemonlegacy-launcher-state.json";
 
     public static async Task<bool> IsSynchronizedAsync(
         string gameDir,

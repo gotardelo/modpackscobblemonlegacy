@@ -1,14 +1,14 @@
 # Cobblemon Legacy - Relatorio de seguranca
 
 Data do teste: 2026-06-20  
-Launcher testado: v1.0.9
+Launcher testado: v1.1.0
 
 ## Arquivos verificados
 
 | Arquivo | Tamanho | SHA256 |
 | --- | ---: | --- |
-| `dist/CobblemonLegacyLauncherSetup.exe` | 56.995.020 bytes | `DCFB9225FC06C2E50EA12874EE35376F9E1FC9E64DE78D3784B24405E8AF80CD` |
-| `publish/win-x64/CobblemonLegacy.exe` | 179.910.539 bytes | `6F22B5D351228995CAC574A3484F6EE22DBB55E946C3C15B4B5522E739F39E2C` |
+| `dist/CobblemonLegacyLauncherSetup.exe` | 57.006.555 bytes | `42DE002D41FFB0DF2842C860C743A89FBDB55C7F7D6D38E0E4EE8E1D157DB645` |
+| `publish/win-x64/CobblemonLegacy.exe` | 179.935.115 bytes | `71EEECE1B411DB1FEF373E1726B58023E1798E0AB2E70A1A91057F258550D8A9` |
 
 ## Resultados
 
@@ -18,6 +18,7 @@ Launcher testado: v1.0.9
 - `dotnet list package --vulnerable --include-transitive`: nenhum pacote vulneravel encontrado nas fontes atuais do NuGet.
 - Instalador em modo silencioso: instalou em pasta temporaria com exit code `0`.
 - Desinstalador em modo silencioso: removeu a instalacao temporaria com exit code `0`.
+- `.\run.ps1 configure-profile`: execucao concluida com exit code `0`.
 - Assinatura digital: instalador e executavel estao `NotSigned`.
 
 ## Observacao importante

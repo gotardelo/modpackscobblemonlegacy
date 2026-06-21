@@ -29,6 +29,8 @@ public partial class MainWindow : Window
     private LauncherSettings? settings;
     private ModpackManifest? manifest;
     private MSession? microsoftSession;
+    private LauncherUpdateInfo? availableUpdate;
+    private LauncherNewsItem? currentNews;
     private LauncherPrimaryAction primaryAction = LauncherPrimaryAction.Hidden;
     private bool isBusy;
     private bool isClosing;
@@ -62,6 +64,8 @@ public partial class MainWindow : Window
 
             await LoadCachedManifestAsync();
             _ = LoadManifestInBackgroundAsync(serverStatusCancellation.Token);
+            _ = CheckLauncherUpdateInBackgroundAsync(serverStatusCancellation.Token);
+            _ = LoadNewsInBackgroundAsync(serverStatusCancellation.Token);
             _ = RefreshServerStatusLoopAsync(serverStatusCancellation.Token);
         }
         catch (Exception ex)
@@ -150,6 +154,7 @@ public partial class MainWindow : Window
 
         ManifestText.Text = $"v{loadedManifest.Version}";
         PackSummaryText.Text = $"{mods} mods | {resourcepacks} resourcepacks";
+        IntegrityText.Text = $"Integridade: {loadedManifest.Files.Count} arquivos no manifest.";
         AppendLog($"Manifest carregado: {mods} mods, {resourcepacks} resourcepacks.");
     }
 
@@ -228,12 +233,16 @@ public partial class MainWindow : Window
             var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
             var readiness = await LauncherRuntime.CheckPackReadinessAsync(gameDir, manifest, LauncherRuntime.JsonOptions);
             SetPrimaryAction(readiness.IsReady ? LauncherPrimaryAction.Ready : LauncherPrimaryAction.NeedsUpdate);
+            SetIntegrityStatus(readiness.IsReady
+                ? $"Integridade: {manifest.Files.Count} arquivos verificados."
+                : $"Integridade: {readiness.Message}");
             SetStatus(readiness.Message);
         }
         catch (Exception ex)
         {
             AppendLog($"Nao foi possivel verificar o pack: {ex.Message}");
             SetPrimaryAction(LauncherPrimaryAction.NeedsUpdate);
+            SetIntegrityStatus("Integridade: verificacao pendente.");
             SetStatus("Nao foi possivel verificar o pack. Clique em ATUALIZAR.");
         }
     }
@@ -462,6 +471,52 @@ public partial class MainWindow : Window
         return versionId;
     }
 
+    private async Task RepairInstallationAsync()
+    {
+        if (isBusy || settings is null)
+            return;
+
+        var result = MessageBox.Show(
+            this,
+            "O reparo vai verificar o pack inteiro e reinstalar o Fabric. Mundos e saves serao preservados. Continuar?",
+            "Cobblemon Legacy",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            SetBusy(true);
+            SetPrimaryAction(LauncherPrimaryAction.Updating);
+            ProgressBar.IsIndeterminate = true;
+            SetIntegrityStatus("Integridade: reparo em andamento...");
+
+            var activeManifest = await EnsureManifestForPlayAsync();
+            var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
+            var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
+
+            await LauncherRuntime.RepairInstallationAsync(http, launcher, activeManifest, gameDir, SetStatus, SetByteProgress);
+            await MinecraftProfileConfigurator.ConfigureAsync(gameDir, settings, SetStatus);
+
+            ProgressBar.IsIndeterminate = false;
+            ProgressBar.Value = 100;
+            SetPrimaryAction(LauncherPrimaryAction.Ready);
+            SetIntegrityStatus($"Integridade: reparo concluido com {activeManifest.Files.Count} arquivos.");
+            SetStatus("Reparo concluido. Pode clicar em JOGAR.");
+        }
+        catch (Exception ex)
+        {
+            _ = RefreshPrimaryActionAsync();
+            ShowError(ex.Message);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     private async Task<MSession> ResolveSessionAsync()
     {
         if (settings is null)
@@ -638,12 +693,18 @@ public partial class MainWindow : Window
 
             Clipboard.SetText(report.Text);
             OpenFileLocation(report.Path);
-            SetStatus("Relatorio de erro copiado. Envie o arquivo ou cole no Discord.");
+            OpenExternalUrl("https://discord.gg/sETS2Fc7Ey");
+            SetStatus("Relatorio copiado e Discord aberto para enviar ao suporte.");
         }
         catch (Exception ex)
         {
             ShowError($"Nao foi possivel gerar o relatorio: {ex.Message}");
         }
+    }
+
+    private async void RepairButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RepairInstallationAsync();
     }
 
     private async void OptionsButton_Click(object sender, RoutedEventArgs e)
@@ -688,6 +749,51 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void UpdateLauncherButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (availableUpdate is null || isBusy)
+            return;
+
+        var result = MessageBox.Show(
+            this,
+            $"Existe uma nova versao do launcher: {availableUpdate.Version}. Baixar e abrir o instalador agora?",
+            "Cobblemon Legacy",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            SetBusy(true);
+            UpdateLauncherButton.IsEnabled = false;
+            ProgressBar.IsIndeterminate = false;
+            ProgressBar.Value = 0;
+            SetStatus($"Baixando launcher {availableUpdate.Version}...");
+
+            var installerPath = await LauncherUpdateService.DownloadInstallerAsync(http, availableUpdate, SetByteProgress);
+            SetStatus("Instalador baixado. O launcher sera fechado para atualizar.");
+            LauncherUpdateService.StartInstallerAndExit(installerPath);
+            Close();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Nao foi possivel atualizar o launcher: {ex.Message}");
+            UpdateLauncherButton.IsEnabled = true;
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private void NewsLinkButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(currentNews?.Url))
+            OpenExternalUrl(currentNews.Url);
+    }
+
     private void OpenFileLocation(string path)
     {
         try
@@ -729,6 +835,53 @@ public partial class MainWindow : Window
             ServerPlayersText.Text = status.ToDisplayText();
             ServerPlayersText.ToolTip = status.ToToolTipText();
         });
+    }
+
+    private async Task CheckLauncherUpdateInBackgroundAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var update = await LauncherUpdateService.CheckForUpdateAsync(http, LauncherRuntime.LauncherVersion);
+            if (cancellationToken.IsCancellationRequested || update is null)
+                return;
+
+            availableUpdate = update;
+            Dispatcher.Invoke(() =>
+            {
+                UpdateLauncherButton.Content = $"Atualizar {update.Version}";
+                UpdateLauncherButton.Visibility = Visibility.Visible;
+                SetStatus($"Nova versao do launcher disponivel: {update.Version}.");
+            });
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Nao foi possivel verificar update do launcher: {ex.Message}");
+        }
+    }
+
+    private async Task LoadNewsInBackgroundAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var news = await LauncherNewsService.LoadLatestAsync(http, LauncherRuntime.JsonOptions);
+            if (cancellationToken.IsCancellationRequested || news is null)
+                return;
+
+            currentNews = news;
+            Dispatcher.Invoke(() => ApplyNewsToUi(news));
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Nao foi possivel carregar avisos: {ex.Message}");
+        }
+    }
+
+    private void ApplyNewsToUi(LauncherNewsItem news)
+    {
+        NewsTitleText.Text = string.IsNullOrWhiteSpace(news.Title) ? "Cobblemon Legacy" : news.Title.Trim();
+        NewsBodyText.Text = news.Message.Trim();
+        NewsLinkButton.Visibility = string.IsNullOrWhiteSpace(news.Url) ? Visibility.Collapsed : Visibility.Visible;
+        NewsPanel.Visibility = Visibility.Visible;
     }
 
     private void WindowChrome_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -806,8 +959,14 @@ public partial class MainWindow : Window
     {
         isBusy = value;
         PlayButton.IsEnabled = !value && IsPrimaryActionClickable(primaryAction);
+        UpdateLauncherButton.IsEnabled = !value && availableUpdate is not null;
         ProgressBar.IsIndeterminate = value;
         ProgressPercentText.Text = value ? "..." : $"{ProgressBar.Value:0}%";
+    }
+
+    private void SetIntegrityStatus(string message)
+    {
+        Dispatcher.Invoke(() => IntegrityText.Text = message);
     }
 
     private void SetStatus(string message)
