@@ -132,6 +132,10 @@
                                 Style="{StaticResource DiagnosticButton}"
                                 Margin="10,0,0,0"
                                 Click="CreatePackageButton_Click" />
+                        <Button Content="Discord"
+                                Style="{StaticResource DiagnosticButton}"
+                                Margin="10,0,0,0"
+                                Click="DiscordButton_Click" />
                         <Button Content="Fechar"
                                 Style="{StaticResource DiagnosticButton}"
                                 Margin="10,0,0,0"

@@ -1,5 +1,5 @@
 #define MyAppName "Cobblemon Legacy Launcher"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.3.0"
 #define MyAppPublisher "Cobblemon Legacy"
 #define MyAppExeName "CobblemonLegacy.exe"
 
@@ -8,6 +8,9 @@ AppId={{E91507EB-0D8C-42C8-9227-3DE36D2CF2E3}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
+AppPublisherURL=https://www.cobblemonlegacy.com.br
+AppSupportURL=https://discord.gg/sETS2Fc7Ey
+AppUpdatesURL=https://gotardelo.github.io/cobblemonlegacy-downloads/
 DefaultDirName={localappdata}\Programs\Cobblemon Legacy Launcher
 DefaultGroupName=Cobblemon Legacy
 OutputDir=..\dist
@@ -15,8 +18,15 @@ OutputBaseFilename=CobblemonLegacyLauncherSetup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+SetupLogging=yes
+InfoBeforeFile=before-install.txt
 SetupIconFile=..\Assets\launcher-icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription=Cobblemon Legacy Launcher
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppVersion}
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 

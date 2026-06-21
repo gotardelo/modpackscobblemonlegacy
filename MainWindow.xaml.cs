@@ -32,6 +32,9 @@ public partial class MainWindow : Window
     private LauncherUpdateInfo? availableUpdate;
     private LauncherNewsItem? currentNews;
     private LauncherNewsFeed? newsFeed;
+    private Process? runningMinecraftProcess;
+    private LauncherUpdateInfo? downloadedUpdate;
+    private string? downloadedUpdateInstallerPath;
     private LauncherPrimaryAction primaryAction = LauncherPrimaryAction.Hidden;
     private bool isBusy;
     private bool isClosing;
@@ -57,6 +60,13 @@ public partial class MainWindow : Window
             AppendLog("Inicializando launcher...");
 
             settings = await LauncherSettings.LoadAsync(LauncherRuntime.JsonOptions);
+            LauncherRuntime.WriteTelemetry("launcher_start", new Dictionary<string, object?>
+            {
+                ["authMode"] = settings.AuthMode,
+                ["ramMb"] = settings.MaximumRamMb,
+                ["performanceProfile"] = settings.PerformanceProfile,
+                ["resourcepackProfile"] = settings.ResourcepackProfile
+            });
             await EnsureAuthChoiceAsync();
             ApplySettingsToUi();
 
@@ -152,11 +162,21 @@ public partial class MainWindow : Window
     {
         var mods = loadedManifest.Files.Count(file => file.Path.StartsWith("mods/", StringComparison.OrdinalIgnoreCase));
         var resourcepacks = loadedManifest.Files.Count(file => file.Path.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase));
+        var enabledResourcepacks = settings is null
+            ? resourcepacks
+            : ResourcepackProfiles.CountEnabledResourcepacks(loadedManifest, settings.ResourcepackProfile);
 
         ManifestText.Text = $"v{loadedManifest.Version}";
-        PackSummaryText.Text = $"{mods} mods | {resourcepacks} resourcepacks";
+        PackSummaryText.Text = $"{mods} mods | {enabledResourcepacks}/{resourcepacks} resourcepacks";
         IntegrityText.Text = $"Integridade: {loadedManifest.Files.Count} arquivos no manifest.";
         AppendLog($"Manifest carregado: {mods} mods, {resourcepacks} resourcepacks.");
+        LauncherRuntime.WriteTelemetry("manifest_loaded", new Dictionary<string, object?>
+        {
+            ["version"] = loadedManifest.Version,
+            ["mods"] = mods,
+            ["resourcepacks"] = resourcepacks,
+            ["enabledResourcepacks"] = enabledResourcepacks
+        });
     }
 
     private async Task<ModpackManifest> EnsureManifestForPlayAsync()
@@ -181,7 +201,7 @@ public partial class MainWindow : Window
         NicknameTextBox.Text = settings.OfflineUsername;
         ShowNicknameEditor(false);
         SetPrimaryAction(HasPlayableProfile() ? LauncherPrimaryAction.Checking : LauncherPrimaryAction.Hidden);
-        RamText.Text = $"RAM: {settings.MaximumRamMb} MB";
+        RamText.Text = $"RAM: {settings.MaximumRamMb} MB | RP: {ResourcepackProfiles.ToDisplayName(settings.ResourcepackProfile)}";
         UpdateAccountText();
     }
 
@@ -191,6 +211,7 @@ public partial class MainWindow : Window
             return;
 
         var hasProfile = !string.IsNullOrWhiteSpace(settings.AuthMode);
+        LoginTitleText.Text = hasProfile ? "Perfil Cobblemon Legacy" : "Opcoes de Login";
         AccountText.Visibility = hasProfile ? Visibility.Visible : Visibility.Collapsed;
         AccountText.Text = settings.AuthMode switch
         {
@@ -232,7 +253,7 @@ public partial class MainWindow : Window
         {
             SetPrimaryAction(LauncherPrimaryAction.Checking);
             var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
-            var readiness = await LauncherRuntime.CheckPackReadinessAsync(gameDir, manifest, LauncherRuntime.JsonOptions);
+            var readiness = await LauncherRuntime.CheckPackReadinessAsync(gameDir, manifest, LauncherRuntime.JsonOptions, settings.ResourcepackProfile);
             SetPrimaryAction(readiness.IsReady ? LauncherPrimaryAction.Ready : LauncherPrimaryAction.NeedsUpdate);
             SetIntegrityStatus(readiness.IsReady
                 ? $"Integridade: {manifest.Files.Count} arquivos verificados."
@@ -266,11 +287,20 @@ public partial class MainWindow : Window
         if (isBusy || settings is null)
             return;
 
+        var launchStopwatch = Stopwatch.StartNew();
+        Process? process = null;
         try
         {
             SetBusy(true);
             SetPrimaryAction(LauncherPrimaryAction.Updating);
             ProgressBar.IsIndeterminate = true;
+            LauncherRuntime.WriteTelemetry("minecraft_launch_requested", new Dictionary<string, object?>
+            {
+                ["authMode"] = settings.AuthMode,
+                ["ramMb"] = settings.MaximumRamMb,
+                ["performanceProfile"] = settings.PerformanceProfile,
+                ["resourcepackProfile"] = settings.ResourcepackProfile
+            });
 
             await SaveOfflineNicknameIfNeededAsync();
             if (isClosing)
@@ -289,12 +319,18 @@ public partial class MainWindow : Window
 
             SetPrimaryAction(LauncherPrimaryAction.Launching);
             SetStatus("Abrindo Minecraft...");
-            var process = await LauncherRuntime.StartGameAsync(launcher, versionId, settings, session, AppendLog);
+            process = await LauncherRuntime.StartGameAsync(launcher, versionId, settings, session, AppendLog);
+            runningMinecraftProcess = process;
             AppendLog($"Minecraft iniciado com PID {process.Id}.");
             await WaitForMinecraftStartupAsync(process, gameDir);
 
             SetStatus(GetMinecraftRunningStatus());
             await MonitorLauncherDuringGameAsync(process);
+            LauncherRuntime.WriteTelemetry("minecraft_closed", new Dictionary<string, object?>
+            {
+                ["exitCode"] = TryGetExitCode(process),
+                ["seconds"] = Math.Round(launchStopwatch.Elapsed.TotalSeconds, 1)
+            });
             SetPrimaryAction(LauncherPrimaryAction.Ready);
         }
         catch (Exception ex) when (IsMicrosoftAuthCancellation(ex))
@@ -304,11 +340,20 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            LauncherRuntime.WriteTelemetry("minecraft_launch_failed", new Dictionary<string, object?>
+            {
+                ["error"] = ex.Message,
+                ["exitCode"] = process is null ? "" : TryGetExitCode(process),
+                ["seconds"] = Math.Round(launchStopwatch.Elapsed.TotalSeconds, 1)
+            });
             _ = RefreshPrimaryActionAsync();
             ShowError(ex.Message);
         }
         finally
         {
+            if (ReferenceEquals(runningMinecraftProcess, process))
+                runningMinecraftProcess = null;
+
             SetBusy(false);
         }
     }
@@ -457,17 +502,29 @@ public partial class MainWindow : Window
         if (settings is null)
             throw new InvalidOperationException("Configuracao nao carregada.");
 
+        var stopwatch = Stopwatch.StartNew();
         var activeManifest = await EnsureManifestForPlayAsync();
+        LauncherRuntime.WriteTelemetry("pack_update_start", new Dictionary<string, object?>
+        {
+            ["manifestVersion"] = activeManifest.Version,
+            ["resourcepackProfile"] = settings.ResourcepackProfile,
+            ["launchAfterUpdate"] = launchAfterUpdate
+        });
 
         var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
         var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
 
-        var versionId = await LauncherRuntime.InstallOrUpdateAsync(http, launcher, activeManifest, gameDir, SetStatus, SetByteProgress);
+        var versionId = await LauncherRuntime.InstallOrUpdateAsync(http, launcher, activeManifest, gameDir, settings.ResourcepackProfile, SetStatus, SetByteProgress);
         await MinecraftProfileConfigurator.ConfigureAsync(gameDir, settings, SetStatus);
 
         ProgressBar.IsIndeterminate = false;
         ProgressBar.Value = 100;
         SetStatus(launchAfterUpdate ? "Pack atualizado. Preparando jogo..." : "Pack atualizado.");
+        LauncherRuntime.WriteTelemetry("pack_update_end", new Dictionary<string, object?>
+        {
+            ["manifestVersion"] = activeManifest.Version,
+            ["seconds"] = Math.Round(stopwatch.Elapsed.TotalSeconds, 1)
+        });
 
         return versionId;
     }
@@ -498,7 +555,13 @@ public partial class MainWindow : Window
             var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
             var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
 
-            await LauncherRuntime.RepairInstallationAsync(http, launcher, activeManifest, gameDir, SetStatus, SetByteProgress);
+            LauncherRuntime.WriteTelemetry("repair_start", new Dictionary<string, object?>
+            {
+                ["manifestVersion"] = activeManifest.Version,
+                ["resourcepackProfile"] = settings.ResourcepackProfile
+            });
+
+            await LauncherRuntime.RepairInstallationAsync(http, launcher, activeManifest, gameDir, settings.ResourcepackProfile, SetStatus, SetByteProgress);
             await MinecraftProfileConfigurator.ConfigureAsync(gameDir, settings, SetStatus);
 
             ProgressBar.IsIndeterminate = false;
@@ -506,6 +569,10 @@ public partial class MainWindow : Window
             SetPrimaryAction(LauncherPrimaryAction.Ready);
             SetIntegrityStatus($"Integridade: reparo concluido com {activeManifest.Files.Count} arquivos.");
             SetStatus("Reparo concluido. Pode clicar em JOGAR.");
+            LauncherRuntime.WriteTelemetry("repair_end", new Dictionary<string, object?>
+            {
+                ["manifestVersion"] = activeManifest.Version
+            });
         }
         catch (Exception ex)
         {
@@ -728,6 +795,42 @@ public partial class MainWindow : Window
         await RepairInstallationAsync();
     }
 
+    private async void VerifyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (isBusy || settings is null)
+            return;
+
+        try
+        {
+            SetBusy(true);
+            SetPrimaryAction(LauncherPrimaryAction.Checking);
+            SetStatus("Verificando integridade do pack...");
+            var activeManifest = await EnsureManifestForPlayAsync();
+            var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
+            var readiness = await LauncherRuntime.CheckPackReadinessAsync(gameDir, activeManifest, LauncherRuntime.JsonOptions, settings.ResourcepackProfile);
+            SetPrimaryAction(readiness.IsReady ? LauncherPrimaryAction.Ready : LauncherPrimaryAction.NeedsUpdate);
+            SetIntegrityStatus(readiness.IsReady
+                ? $"Integridade: ok ({ResourcepackProfiles.ToDisplayName(settings.ResourcepackProfile)})."
+                : $"Integridade: {readiness.Message}");
+            SetStatus(readiness.Message);
+            LauncherRuntime.WriteTelemetry("pack_verify", new Dictionary<string, object?>
+            {
+                ["ready"] = readiness.IsReady,
+                ["message"] = readiness.Message,
+                ["resourcepackProfile"] = settings.ResourcepackProfile
+            });
+        }
+        catch (Exception ex)
+        {
+            _ = RefreshPrimaryActionAsync();
+            ShowError($"Nao foi possivel verificar o pack: {ex.Message}");
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     private async void OptionsButton_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -746,6 +849,8 @@ public partial class MainWindow : Window
             settings.ApplyFrom(dialog.Settings);
             await settings.SaveAsync(LauncherRuntime.JsonOptions);
             ApplySettingsToUi();
+            if (manifest is not null)
+                ApplyManifestToUi(manifest);
             await RefreshPrimaryActionAsync();
             SetStatus("Opcoes salvas.");
         }
@@ -775,6 +880,38 @@ public partial class MainWindow : Window
         if (availableUpdate is null || isBusy)
             return;
 
+        if (runningMinecraftProcess is not null && !runningMinecraftProcess.HasExited)
+        {
+            MessageBox.Show(
+                this,
+                "Feche o Minecraft antes de atualizar o launcher. Assim evitamos arquivo travado e instalacao incompleta.",
+                "Cobblemon Legacy",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (downloadedUpdate is not null
+            && string.Equals(downloadedUpdate.TagName, availableUpdate.TagName, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(downloadedUpdateInstallerPath)
+            && File.Exists(downloadedUpdateInstallerPath))
+        {
+            var installDownloaded = MessageBox.Show(
+                this,
+                $"O instalador {availableUpdate.TagName} ja esta baixado. Fechar o launcher e instalar agora?",
+                "Cobblemon Legacy",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (installDownloaded == MessageBoxResult.Yes)
+            {
+                LauncherUpdateService.StartInstallerAndExit(downloadedUpdateInstallerPath);
+                Close();
+            }
+
+            return;
+        }
+
         var result = MessageBox.Show(
             this,
             BuildUpdatePrompt(availableUpdate),
@@ -792,11 +929,35 @@ public partial class MainWindow : Window
             ProgressBar.IsIndeterminate = false;
             ProgressBar.Value = 0;
             SetStatus($"Baixando launcher {availableUpdate.Version}...");
+            LauncherRuntime.WriteTelemetry("launcher_update_download_start", new Dictionary<string, object?>
+            {
+                ["version"] = availableUpdate.TagName,
+                ["size"] = availableUpdate.Size
+            });
 
             var installerPath = await LauncherUpdateService.DownloadInstallerAsync(http, availableUpdate, SetByteProgress);
-            SetStatus("Instalador baixado. O launcher sera fechado para atualizar.");
-            LauncherUpdateService.StartInstallerAndExit(installerPath);
-            Close();
+            downloadedUpdate = availableUpdate;
+            downloadedUpdateInstallerPath = installerPath;
+            UpdateLauncherButton.Content = $"Instalar {availableUpdate.Version}";
+            SetStatus("Instalador baixado e verificado.");
+            LauncherRuntime.WriteTelemetry("launcher_update_download_end", new Dictionary<string, object?>
+            {
+                ["version"] = availableUpdate.TagName,
+                ["path"] = installerPath
+            });
+
+            var installNow = MessageBox.Show(
+                this,
+                "Instalador baixado. Fechar o launcher e instalar agora?",
+                "Cobblemon Legacy",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (installNow == MessageBoxResult.Yes)
+            {
+                LauncherUpdateService.StartInstallerAndExit(installerPath);
+                Close();
+            }
         }
         catch (Exception ex)
         {
@@ -1093,6 +1254,7 @@ public partial class MainWindow : Window
 
     private void ShowError(string message)
     {
+        LauncherRuntime.WriteTelemetry("ui_error", new Dictionary<string, object?> { ["message"] = message });
         SetStatus($"Erro: {message}");
         MessageBox.Show(this, message, "Cobblemon Legacy", MessageBoxButton.OK, MessageBoxImage.Error);
     }

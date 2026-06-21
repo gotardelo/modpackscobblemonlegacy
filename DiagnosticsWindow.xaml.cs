@@ -52,6 +52,22 @@ public partial class DiagnosticsWindow : Window
         Close();
     }
 
+    private void DiscordButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://discord.gg/sETS2Fc7Ey")
+            {
+                UseShellExecute = true
+            });
+            StatusText.Text = "Discord aberto para suporte.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Nao foi possivel abrir Discord: {ex.Message}";
+        }
+    }
+
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState == MouseButtonState.Pressed)

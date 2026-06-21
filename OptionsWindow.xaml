@@ -205,6 +205,20 @@
                     <TextBlock Text="Esse perfil ajusta graficos, distancia de renderizacao, particulas e FPS na proxima preparacao do jogo."
                                Style="{StaticResource HintText}" />
 
+                    <TextBlock Text="Resourcepacks"
+                               Style="{StaticResource FieldLabel}" />
+                    <ComboBox x:Name="ResourcepackProfileComboBox"
+                              SelectedValuePath="Tag">
+                        <ComboBoxItem Content="Completo"
+                                      Tag="full" />
+                        <ComboBoxItem Content="Equilibrado"
+                                      Tag="balanced" />
+                        <ComboBoxItem Content="Leve para PC fraco"
+                                      Tag="essential" />
+                    </ComboBox>
+                    <TextBlock Text="Completo usa todos os visuais. Leve baixa menos resourcepacks para abrir melhor em computadores fracos."
+                               Style="{StaticResource HintText}" />
+
                     <TextBlock Text="Resolucao"
                                Style="{StaticResource FieldLabel}"
                                Margin="0,4,0,7" />

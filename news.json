@@ -1,6 +1,12 @@
 {
   "items": [
     {
+      "title": "Launcher v1.3.0: estabilidade e PCs fracos",
+      "message": "Adicionamos resourcepacks leves/opcionais, verificacao manual, backup de configuracoes, telemetria local de suporte, status do servidor mais completo e instalador melhorado.",
+      "url": "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/tag/launcher-v1.3.0",
+      "publishedAt": "2026-06-21T18:00:00-03:00"
+    },
+    {
       "title": "Launcher v1.2.0: diagnostico e suporte",
       "message": "Nova tela de diagnostico, pacote ZIP de suporte, changelog completo e perfis de performance reais para PC fraco, equilibrado e alto desempenho.",
       "url": "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/tag/launcher-v1.2.0",

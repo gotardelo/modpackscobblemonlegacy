@@ -86,6 +86,7 @@ internal static class MinecraftProfileConfigurator
         }
 
         var preset = PerformancePreset.ForProfile(settings.PerformanceProfile, LauncherRuntime.GetPerformanceTier());
+        await LauncherRuntime.BackupUserConfigurationAsync(gameDir, log);
 
         SetOption(map, order, "graphicsMode", "0");
         SetOption(map, order, "renderDistance", preset.RenderDistance.ToString());

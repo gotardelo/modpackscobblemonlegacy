@@ -409,6 +409,11 @@
                             Width="104"
                             Margin="0,0,8,0"
                             Click="DiagnosticsButton_Click" />
+                    <Button Content="Verificar"
+                            Style="{StaticResource TopOptionsButton}"
+                            Width="92"
+                            Margin="0,0,8,0"
+                            Click="VerifyButton_Click" />
                     <Button Content="Opcoes"
                             Style="{StaticResource TopOptionsButton}"
                             Margin="0,0,8,0"
@@ -510,7 +515,8 @@
                                               Opacity="0.66" />
                         </Border.Effect>
                         <StackPanel>
-                            <TextBlock Text="Opções de Login"
+                            <TextBlock x:Name="LoginTitleText"
+                                       Text="Opcoes de Login"
                                        Foreground="#FFFFFF"
                                        FontFamily="{StaticResource GameDisplayFont}"
                                        FontSize="22"

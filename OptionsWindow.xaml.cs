@@ -29,6 +29,7 @@ public partial class OptionsWindow : Window
         RamSlider.Value = Settings.MaximumRamMb;
         CompatibilityModeCheckBox.IsChecked = Settings.CompatibilityMode;
         PerformanceProfileComboBox.SelectedValue = Settings.PerformanceProfile;
+        ResourcepackProfileComboBox.SelectedValue = Settings.ResourcepackProfile;
         LauncherVisibilityComboBox.SelectedValue = Settings.LauncherVisibility;
         UseIntegratedJavaCheckBox.IsChecked = Settings.UseIntegratedJava;
         JavaPathTextBox.Text = Settings.JavaPath;
@@ -48,6 +49,8 @@ public partial class OptionsWindow : Window
             Settings.CompatibilityMode = CompatibilityModeCheckBox.IsChecked == true;
             Settings.PerformanceProfile = PerformanceProfileComboBox.SelectedValue as string
                 ?? PerformanceProfiles.Auto;
+            Settings.ResourcepackProfile = ResourcepackProfileComboBox.SelectedValue as string
+                ?? ResourcepackProfiles.Full;
             Settings.LauncherVisibility = LauncherVisibilityComboBox.SelectedValue as string
                 ?? LauncherVisibilityModes.HideUntilGameExits;
             Settings.UseIntegratedJava = UseIntegratedJavaCheckBox.IsChecked == true;
@@ -81,18 +84,21 @@ public partial class OptionsWindow : Window
     {
         ApplyPreset(854, 480, Math.Min(3072, LauncherRuntime.GetRecommendedMaximumRamMb()), compatibilityMode: true);
         PerformanceProfileComboBox.SelectedValue = PerformanceProfiles.Low;
+        ResourcepackProfileComboBox.SelectedValue = ResourcepackProfiles.Essential;
     }
 
     private void BalancedPresetButton_Click(object sender, RoutedEventArgs e)
     {
         ApplyPreset(1280, 720, LauncherRuntime.GetRecommendedMaximumRamMb(), compatibilityMode: false);
         PerformanceProfileComboBox.SelectedValue = PerformanceProfiles.Balanced;
+        ResourcepackProfileComboBox.SelectedValue = ResourcepackProfiles.Balanced;
     }
 
     private void HighPresetButton_Click(object sender, RoutedEventArgs e)
     {
         ApplyPreset(1600, 900, Math.Max(4096, LauncherRuntime.GetRecommendedMaximumRamMb()), compatibilityMode: false);
         PerformanceProfileComboBox.SelectedValue = PerformanceProfiles.High;
+        ResourcepackProfileComboBox.SelectedValue = ResourcepackProfiles.Full;
     }
 
     private void ApplyPreset(int width, int height, int ramMb, bool compatibilityMode)

@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.2.0";
+    public const string LauncherVersion = "1.3.0";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -87,6 +87,7 @@ internal static class LauncherRuntime
         MinecraftLauncher launcher,
         ModpackManifest manifest,
         string gameDir,
+        string resourcepackProfile,
         Action<string>? log = null,
         Action<long, long>? byteProgress = null)
     {
@@ -121,7 +122,7 @@ internal static class LauncherRuntime
         await FabricProfileInstaller.RepairLibrariesAsync(http, gameDir, fabricVersionId, log);
 
         log?.Invoke("Sincronizando mods, resourcepacks e configs...");
-        await ManagedFileSynchronizer.SyncAsync(http, gameDir, manifest, JsonOptions, log, byteProgress);
+        await ManagedFileSynchronizer.SyncAsync(http, gameDir, manifest, JsonOptions, resourcepackProfile, log, byteProgress);
 
         return fabricVersionId;
     }
@@ -131,6 +132,7 @@ internal static class LauncherRuntime
         MinecraftLauncher launcher,
         ModpackManifest manifest,
         string gameDir,
+        string resourcepackProfile,
         Action<string>? log = null,
         Action<long, long>? byteProgress = null)
     {
@@ -141,7 +143,9 @@ internal static class LauncherRuntime
         RemoveFabricInstall(gameDir, manifest.MinecraftVersion, log);
         ClearMinecraftProcessLog();
 
-        var versionId = await InstallOrUpdateAsync(http, launcher, manifest, gameDir, log, byteProgress);
+        await BackupUserConfigurationAsync(gameDir, log);
+
+        var versionId = await InstallOrUpdateAsync(http, launcher, manifest, gameDir, resourcepackProfile, log, byteProgress);
         log?.Invoke("Reparo concluido.");
         return versionId;
     }
@@ -149,7 +153,8 @@ internal static class LauncherRuntime
     public static async Task<PackReadiness> CheckPackReadinessAsync(
         string gameDir,
         ModpackManifest manifest,
-        JsonSerializerOptions jsonOptions)
+        JsonSerializerOptions jsonOptions,
+        string resourcepackProfile)
     {
         if (!IsVersionInstalled(gameDir, manifest.MinecraftVersion))
             return new PackReadiness(false, $"Minecraft {manifest.MinecraftVersion} precisa ser instalado.");
@@ -161,7 +166,7 @@ internal static class LauncherRuntime
         if (fabricVersion is null || !await FabricProfileInstaller.HasRequiredLibrariesAsync(gameDir, fabricVersion))
             return new PackReadiness(false, "Bibliotecas do Fabric precisam ser reparadas.");
 
-        if (!await ManagedFileSynchronizer.IsSynchronizedAsync(gameDir, manifest, jsonOptions))
+        if (!await ManagedFileSynchronizer.IsSynchronizedAsync(gameDir, manifest, jsonOptions, resourcepackProfile))
             return new PackReadiness(false, "Pack precisa ser atualizado.");
 
         return new PackReadiness(true, "Pronto para jogar.");
@@ -644,6 +649,119 @@ internal static class LauncherRuntime
         return $"{size:0.##} {units[unit]}";
     }
 
+    public static string TelemetryPath { get; } = Path.Combine(
+        Path.GetDirectoryName(LauncherSettings.SettingsPath)!,
+        "telemetry.jsonl");
+
+    public static void WriteTelemetry(string eventName, IReadOnlyDictionary<string, object?>? data = null)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(TelemetryPath)!);
+            if (File.Exists(TelemetryPath) && new FileInfo(TelemetryPath).Length > 1024 * 1024)
+                File.WriteAllText(TelemetryPath, "", Encoding.UTF8);
+
+            var payload = new Dictionary<string, object?>
+            {
+                ["time"] = DateTimeOffset.Now,
+                ["event"] = eventName,
+                ["launcherVersion"] = LauncherVersion
+            };
+
+            if (data is not null)
+            {
+                foreach (var item in data)
+                    payload[item.Key] = item.Value;
+            }
+
+            File.AppendAllText(TelemetryPath, JsonSerializer.Serialize(payload, TelemetryJsonOptions) + Environment.NewLine, Encoding.UTF8);
+        }
+        catch
+        {
+            // Local telemetry is diagnostic only.
+        }
+    }
+
+    private static readonly JsonSerializerOptions TelemetryJsonOptions = new(JsonSerializerDefaults.Web);
+
+    public static Task<string?> BackupUserConfigurationAsync(string gameDir, Action<string>? log = null)
+    {
+        try
+        {
+            var root = Path.GetFullPath(gameDir);
+            var backupDir = Path.Combine(root, "backups", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            var copied = 0;
+
+            copied += CopyBackupFile(root, backupDir, "options.txt");
+            copied += CopyBackupFile(root, backupDir, "optionsof.txt");
+            copied += CopyBackupFile(root, backupDir, "servers.dat");
+            copied += CopyBackupDirectory(root, backupDir, "config", maxFiles: 250, maxBytes: 50L * 1024 * 1024);
+
+            if (copied == 0)
+                return Task.FromResult<string?>(null);
+
+            log?.Invoke($"Backup de configuracoes criado: {backupDir}");
+            WriteTelemetry("backup_created", new Dictionary<string, object?>
+            {
+                ["path"] = backupDir,
+                ["files"] = copied
+            });
+            return Task.FromResult<string?>(backupDir);
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke($"Nao foi possivel criar backup de configuracoes: {ex.Message}");
+            WriteTelemetry("backup_failed", new Dictionary<string, object?> { ["error"] = ex.Message });
+            return Task.FromResult<string?>(null);
+        }
+    }
+
+    private static int CopyBackupFile(string gameDir, string backupDir, string relativePath)
+    {
+        var source = Path.Combine(gameDir, relativePath);
+        if (!File.Exists(source))
+            return 0;
+
+        var target = Path.Combine(backupDir, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        File.Copy(source, target, overwrite: true);
+        return 1;
+    }
+
+    private static int CopyBackupDirectory(string gameDir, string backupDir, string relativeDirectory, int maxFiles, long maxBytes)
+    {
+        var sourceDir = Path.Combine(gameDir, relativeDirectory);
+        if (!Directory.Exists(sourceDir))
+            return 0;
+
+        var root = Path.GetFullPath(gameDir);
+        var copied = 0;
+        long bytes = 0;
+
+        foreach (var source in Directory.EnumerateFiles(sourceDir, "*", SearchOption.AllDirectories))
+        {
+            if (copied >= maxFiles || bytes >= maxBytes)
+                break;
+
+            var fullSource = Path.GetFullPath(source);
+            if (!IsInsideDirectory(fullSource, root))
+                continue;
+
+            var info = new FileInfo(fullSource);
+            if (info.Length <= 0 || bytes + info.Length > maxBytes)
+                continue;
+
+            var relativePath = Path.GetRelativePath(root, fullSource);
+            var target = Path.Combine(backupDir, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(fullSource, target, overwrite: true);
+            copied++;
+            bytes += info.Length;
+        }
+
+        return copied;
+    }
+
     public static async Task<CrashReportResult> CreateCrashReportAsync(
         LauncherSettings? settings,
         string visibleLog,
@@ -688,6 +806,7 @@ internal static class LauncherRuntime
             AddFileToArchiveIfExists(archive, Path.Combine(diagnosticsDir, "launcher.log"), "launcher/launcher.log");
             AddFileToArchiveIfExists(archive, Path.Combine(diagnosticsDir, "minecraft-process.log"), "launcher/minecraft-process.log");
             AddFileToArchiveIfExists(archive, Path.Combine(diagnosticsDir, "last-launch-command.txt"), "launcher/last-launch-command.txt");
+            AddFileToArchiveIfExists(archive, TelemetryPath, "launcher/telemetry.jsonl");
             AddFileToArchiveIfExists(archive, ModpackManifestLoader.CachePath, "launcher/manifest-cache.json");
             AddFileToArchiveIfExists(archive, Path.Combine(gameDir, "logs", "latest.log"), "minecraft/latest.log");
 
@@ -697,6 +816,12 @@ internal static class LauncherRuntime
             var latestJavaCrash = FindNewestJavaCrashLog(gameDir);
             AddFileToArchiveIfExists(archive, latestJavaCrash, "minecraft/latest-java-crash.log");
         }
+
+        WriteTelemetry("support_package_created", new Dictionary<string, object?>
+        {
+            ["report"] = report.Path,
+            ["zip"] = zipPath
+        });
 
         return new SupportPackageResult(report.Path, zipPath, report.Text);
     }
@@ -729,14 +854,16 @@ internal static class LauncherRuntime
         }, string.IsNullOrWhiteSpace(settings?.AuthMode) ? DiagnosticState.Warning : DiagnosticState.Ok);
         AddDiagnostic(items, "RAM configurada", settings is null ? "Desconhecida" : $"{settings.MaximumRamMb} MB", DiagnosticState.Ok);
         AddDiagnostic(items, "Modo desempenho", settings?.PerformanceProfile ?? PerformanceProfiles.Auto, DiagnosticState.Ok);
+        AddDiagnostic(items, "Resourcepacks", ResourcepackProfiles.ToDisplayName(settings?.ResourcepackProfile), DiagnosticState.Ok);
         AddDiagnostic(items, "Java", settings is null || settings.UseIntegratedJava ? "Runtime integrado" : settings.JavaPath, settings is not null && !settings.UseIntegratedJava && !File.Exists(settings.JavaPath) ? DiagnosticState.Error : DiagnosticState.Ok);
         AddDiagnostic(items, "Manifest", manifest is null ? "Nao carregado" : $"{manifest.Version} / {manifest.Files.Count} arquivos", manifest is null ? DiagnosticState.Warning : DiagnosticState.Ok);
+        AddDiagnostic(items, "Telemetria local", TelemetryPath, File.Exists(TelemetryPath) ? DiagnosticState.Ok : DiagnosticState.Warning);
 
         if (settings is not null && manifest is not null)
         {
             try
             {
-                var readiness = await CheckPackReadinessAsync(gameDir, manifest, JsonOptions);
+                var readiness = await CheckPackReadinessAsync(gameDir, manifest, JsonOptions, settings.ResourcepackProfile);
                 AddDiagnostic(items, "Integridade do pack", readiness.Message, readiness.IsReady ? DiagnosticState.Ok : DiagnosticState.Warning);
 
                 var fabricVersion = FabricProfileInstaller.FindInstalledVersionId(gameDir, manifest.MinecraftVersion, manifest.FabricLoaderVersion);
@@ -805,6 +932,7 @@ internal static class LauncherRuntime
         report.AppendLine($"Visibilidade launcher: {settings?.LauncherVisibility ?? "desconhecida"}");
         report.AppendLine($"Modo compatibilidade: {settings?.CompatibilityMode.ToString() ?? "desconhecido"}");
         report.AppendLine($"Perfil performance: {settings?.PerformanceProfile ?? PerformanceProfiles.Auto}");
+        report.AppendLine($"Perfil resourcepacks: {ResourcepackProfiles.ToDisplayName(settings?.ResourcepackProfile)}");
         report.AppendLine($"Java integrado: {settings?.UseIntegratedJava.ToString() ?? "desconhecido"}");
         report.AppendLine($"Java customizado: {settings?.JavaPath ?? ""}");
         report.AppendLine($"JVM extra: {settings?.ExtraJvmArguments ?? ""}");
@@ -823,6 +951,7 @@ internal static class LauncherRuntime
             new ReportFile("Launcher process log", Path.Combine(diagnosticsDir, "launcher.log"), 120),
             new ReportFile("Saida do Java", Path.Combine(diagnosticsDir, "minecraft-process.log"), 180),
             new ReportFile("Ultimo comando sanitizado", Path.Combine(diagnosticsDir, "last-launch-command.txt"), 40),
+            new ReportFile("Telemetria local", TelemetryPath, 120),
             new ReportFile("Minecraft latest.log", Path.Combine(gameDir, "logs", "latest.log"), 220),
             new ReportFile("Minecraft crash report", latestCrashReport, 220),
             new ReportFile("Java crash log", latestJavaCrash, 220)
@@ -930,6 +1059,83 @@ internal static class PerformanceProfiles
     public const string High = "high";
 }
 
+internal static class ResourcepackProfiles
+{
+    public const string Full = "full";
+    public const string Balanced = "balanced";
+    public const string Essential = "essential";
+
+    private static readonly string[] EssentialKeywords =
+    [
+        "icon",
+        "minimap"
+    ];
+
+    private static readonly string[] BalancedBlockedKeywords =
+    [
+        "animated",
+        "fresh",
+        "motion",
+        "wallpaper",
+        "costume",
+        "overhaul",
+        "shoulder",
+        "decubes",
+        "genomons",
+        "mysticmons",
+        "lost lore",
+        "kale",
+        "paradox",
+        "dragon",
+        "naruto",
+        "pigeon",
+        "oooooooo"
+    ];
+
+    public static string Normalize(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            Balanced => Balanced,
+            Essential => Essential,
+            _ => Full
+        };
+    }
+
+    public static string ToDisplayName(string? value)
+    {
+        return Normalize(value) switch
+        {
+            Balanced => "Equilibrado",
+            Essential => "Leve",
+            _ => "Completo"
+        };
+    }
+
+    public static bool Includes(string relativePath, string? profile)
+    {
+        var normalizedProfile = Normalize(profile);
+        if (!relativePath.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (normalizedProfile == Full)
+            return true;
+
+        var fileName = Path.GetFileName(relativePath).ToLowerInvariant();
+        if (normalizedProfile == Essential)
+            return EssentialKeywords.Any(keyword => fileName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+
+        return !BalancedBlockedKeywords.Any(keyword => fileName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static int CountEnabledResourcepacks(ModpackManifest manifest, string? profile)
+    {
+        return manifest.Files.Count(file =>
+            file.Path.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase)
+            && Includes(file.Path.Replace('\\', '/'), profile));
+    }
+}
+
 public sealed class LauncherSettings
 {
     private const int LegacyRecommendedRamMb = 8192;
@@ -951,6 +1157,7 @@ public sealed class LauncherSettings
     public string LauncherVisibility { get; set; } = LauncherVisibilityModes.HideUntilGameExits;
     public bool CompatibilityMode { get; set; }
     public string PerformanceProfile { get; set; } = PerformanceProfiles.Auto;
+    public string ResourcepackProfile { get; set; } = ResourcepackProfiles.Full;
     public bool UseIntegratedJava { get; set; } = true;
     public string JavaPath { get; set; } = "";
     public string ExtraJvmArguments { get; set; } = "";
@@ -972,6 +1179,7 @@ public sealed class LauncherSettings
             LauncherVisibility = LauncherVisibility,
             CompatibilityMode = CompatibilityMode,
             PerformanceProfile = PerformanceProfile,
+            ResourcepackProfile = ResourcepackProfile,
             UseIntegratedJava = UseIntegratedJava,
             JavaPath = JavaPath,
             ExtraJvmArguments = ExtraJvmArguments,
@@ -993,6 +1201,7 @@ public sealed class LauncherSettings
         LauncherVisibility = source.LauncherVisibility;
         CompatibilityMode = source.CompatibilityMode;
         PerformanceProfile = source.PerformanceProfile;
+        ResourcepackProfile = source.ResourcepackProfile;
         UseIntegratedJava = source.UseIntegratedJava;
         JavaPath = source.JavaPath;
         ExtraJvmArguments = source.ExtraJvmArguments;
@@ -1066,6 +1275,7 @@ public sealed class LauncherSettings
         WindowHeight = Math.Clamp(WindowHeight <= 0 ? 480 : WindowHeight, 360, 2160);
         LauncherVisibility = NormalizeLauncherVisibility(LauncherVisibility);
         PerformanceProfile = NormalizePerformanceProfile(PerformanceProfile);
+        ResourcepackProfile = ResourcepackProfiles.Normalize(ResourcepackProfile);
         JavaPath = JavaPath?.Trim() ?? "";
         ExtraJvmArguments = ExtraJvmArguments?.Trim() ?? "";
 
@@ -1583,16 +1793,15 @@ internal static class ManagedFileSynchronizer
     public static async Task<bool> IsSynchronizedAsync(
         string gameDir,
         ModpackManifest manifest,
-        JsonSerializerOptions jsonOptions)
+        JsonSerializerOptions jsonOptions,
+        string resourcepackProfile)
     {
         var statePath = Path.Combine(gameDir, StateFileName);
         var state = await LoadStateAsync(statePath, jsonOptions);
         if (!string.Equals(state.ManifestVersion, manifest.Version, StringComparison.OrdinalIgnoreCase))
             return false;
 
-        var entries = manifest.Files
-            .Select(file => new ManagedFileEntry(NormalizeRelativePath(file.Path), file))
-            .ToArray();
+        var entries = GetEnabledEntries(manifest, resourcepackProfile);
         var expectedPaths = new HashSet<string>(entries.Select(entry => entry.RelativePath), StringComparer.OrdinalIgnoreCase);
         var managedPaths = new HashSet<string>(state.ManagedFiles, StringComparer.OrdinalIgnoreCase);
 
@@ -1617,6 +1826,7 @@ internal static class ManagedFileSynchronizer
         string gameDir,
         ModpackManifest manifest,
         JsonSerializerOptions jsonOptions,
+        string resourcepackProfile,
         Action<string>? log = null,
         Action<long, long>? byteProgress = null)
     {
@@ -1624,9 +1834,7 @@ internal static class ManagedFileSynchronizer
         var state = await LoadStateAsync(statePath, jsonOptions);
         var previousManagedFiles = new HashSet<string>(state.ManagedFiles, StringComparer.OrdinalIgnoreCase);
         var canTrustInstalledFiles = string.Equals(state.ManifestVersion, manifest.Version, StringComparison.OrdinalIgnoreCase);
-        var entries = manifest.Files
-            .Select(file => new ManagedFileEntry(NormalizeRelativePath(file.Path), file))
-            .ToArray();
+        var entries = GetEnabledEntries(manifest, resourcepackProfile);
         var expectedPaths = new HashSet<string>(entries.Select(entry => entry.RelativePath), StringComparer.OrdinalIgnoreCase);
         var parallelDownloads = LauncherRuntime.GetRecommendedParallelDownloads();
         var semaphore = new SemaphoreSlim(parallelDownloads);
@@ -1636,6 +1844,9 @@ internal static class ManagedFileSynchronizer
         var reused = 0;
         var downloaded = 0;
         var skipped = 0;
+        var totalResourcepacks = manifest.Files.Count(file => file.Path.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase));
+        var enabledResourcepacks = entries.Count(entry => entry.RelativePath.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase));
+        log?.Invoke($"Resourcepacks: perfil {ResourcepackProfiles.ToDisplayName(resourcepackProfile)} ({enabledResourcepacks}/{totalResourcepacks}).");
         log?.Invoke($"Verificando pack com {parallelDownloads} download(s) paralelo(s).");
 
         await Task.WhenAll(entries.Select(async entry =>
@@ -1703,6 +1914,14 @@ internal static class ManagedFileSynchronizer
         await File.WriteAllTextAsync(statePath, JsonSerializer.Serialize(state, jsonOptions), Encoding.UTF8);
 
         log?.Invoke($"Pack sincronizado: {reused} mantidos, {downloaded} baixados, {removed} removidos, {skipped} ignorados.");
+    }
+
+    private static ManagedFileEntry[] GetEnabledEntries(ModpackManifest manifest, string resourcepackProfile)
+    {
+        return manifest.Files
+            .Select(file => new ManagedFileEntry(NormalizeRelativePath(file.Path), file))
+            .Where(entry => ResourcepackProfiles.Includes(entry.RelativePath, resourcepackProfile))
+            .ToArray();
     }
 
     private static async Task<ManagedFileSyncResult> EnsureFileAsync(

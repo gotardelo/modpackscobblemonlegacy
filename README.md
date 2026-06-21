@@ -30,6 +30,10 @@ Ao atualizar/jogar, o launcher tambem:
 - gera pacote ZIP de suporte com logs e relatorio, e abre o Discord;
 - oferece botao `Reparar` para reinstalar Fabric e revalidar o pack sem apagar mundos.
 - aplica perfis de performance reais em `options.txt`: automatico, PC fraco, equilibrado e alto desempenho.
+- oferece perfis de resourcepacks: completo, equilibrado e leve para PC fraco.
+- cria backup local de `options.txt`, `servers.dat` e `config/` antes de reparos e ajustes automaticos.
+- grava telemetria local em `%APPDATA%\CobblemonLegacyLauncher\telemetry.jsonl` para suporte.
+- tem botao `Verificar` para checar integridade sem baixar nada.
 
 ## Links uteis
 
@@ -78,6 +82,12 @@ dotnet publish -c Release -r win-x64 -o publish\win-x64
 ```
 
 Para gerar instalador `.exe`, abra `installer\CobblemonLegacy.iss` no Inno Setup e compile. O instalador final sai em `dist\CobblemonLegacyLauncherSetup.exe`.
+
+Tambem existe um script de release local:
+
+```powershell
+.\tools\Publish-LauncherRelease.ps1 -Version "1.3.0"
+```
 
 ## Login
 

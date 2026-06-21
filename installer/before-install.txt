@@ -1,0 +1,12 @@
+Cobblemon Legacy Launcher
+
+Este instalador prepara o launcher oficial do servidor Cobblemon Legacy.
+
+Links oficiais:
+- Site: https://www.cobblemonlegacy.com.br
+- Discord: https://discord.gg/sETS2Fc7Ey
+- Downloads: https://gotardelo.github.io/cobblemonlegacy-downloads/
+
+O launcher instala o Minecraft/Fabric 1.21.1 em uma pasta separada no AppData do jogador, sincroniza mods/resourcepacks do modpack e cria logs locais para suporte.
+
+Sem assinatura digital, alguns Windows podem mostrar aviso do SmartScreen. Isso nao significa automaticamente virus; significa que o executavel ainda nao tem reputacao suficiente na Microsoft. Baixe apenas pelos links oficiais acima.

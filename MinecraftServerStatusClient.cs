@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -19,6 +20,7 @@ internal static class MinecraftServerStatusClient
             timeout.CancelAfter(QueryTimeout);
 
             using var client = new TcpClient();
+            var stopwatch = Stopwatch.StartNew();
             await client.ConnectAsync(endpoint.Host, endpoint.Port, timeout.Token);
 
             await using var stream = client.GetStream();
@@ -35,7 +37,8 @@ internal static class MinecraftServerStatusClient
 
             var jsonLength = await ReadVarIntAsync(stream, timeout.Token);
             var jsonBytes = await ReadExactAsync(stream, jsonLength, timeout.Token);
-            return ParseStatusJson(Encoding.UTF8.GetString(jsonBytes));
+            stopwatch.Stop();
+            return ParseStatusJson(Encoding.UTF8.GetString(jsonBytes), stopwatch.ElapsedMilliseconds);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -77,13 +80,21 @@ internal static class MinecraftServerStatusClient
         await stream.WriteAsync(framed.ToArray(), cancellationToken);
     }
 
-    private static MinecraftServerStatus ParseStatusJson(string json)
+    private static MinecraftServerStatus ParseStatusJson(string json, long latencyMs)
     {
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
 
         if (!root.TryGetProperty("players", out var players))
             return MinecraftServerStatus.Unavailable("Servidor nao informou jogadores.");
+
+        var versionName = root.TryGetProperty("version", out var version)
+            && version.TryGetProperty("name", out var versionNameElement)
+            ? versionNameElement.GetString() ?? ""
+            : "";
+        var motd = root.TryGetProperty("description", out var description)
+            ? FlattenDescription(description).Trim()
+            : "";
 
         var online = players.TryGetProperty("online", out var onlineElement)
             ? onlineElement.GetInt32()
@@ -102,7 +113,28 @@ internal static class MinecraftServerStatusClient
             }
         }
 
-        return MinecraftServerStatus.Available(online, max, names);
+        return MinecraftServerStatus.Available(online, max, names, latencyMs, motd, versionName);
+    }
+
+    private static string FlattenDescription(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.String)
+            return element.GetString() ?? "";
+
+        if (element.ValueKind != JsonValueKind.Object)
+            return "";
+
+        var builder = new StringBuilder();
+        if (element.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+            builder.Append(text.GetString());
+
+        if (element.TryGetProperty("extra", out var extra) && extra.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in extra.EnumerateArray())
+                builder.Append(FlattenDescription(child));
+        }
+
+        return builder.ToString();
     }
 
     private static async Task<int> ReadVarIntAsync(Stream stream, CancellationToken cancellationToken)
@@ -176,16 +208,30 @@ internal static class MinecraftServerStatusClient
     }
 }
 
-internal sealed record MinecraftServerStatus(bool IsAvailable, int Online, int Max, IReadOnlyList<string> Sample, string Error)
+internal sealed record MinecraftServerStatus(
+    bool IsAvailable,
+    int Online,
+    int Max,
+    IReadOnlyList<string> Sample,
+    string Error,
+    long LatencyMs,
+    string Motd,
+    string VersionName)
 {
-    public static MinecraftServerStatus Available(int online, int max, IReadOnlyList<string> sample)
+    public static MinecraftServerStatus Available(
+        int online,
+        int max,
+        IReadOnlyList<string> sample,
+        long latencyMs,
+        string motd,
+        string versionName)
     {
-        return new MinecraftServerStatus(true, online, max, sample, "");
+        return new MinecraftServerStatus(true, online, max, sample, "", latencyMs, motd, versionName);
     }
 
     public static MinecraftServerStatus Unavailable(string error)
     {
-        return new MinecraftServerStatus(false, 0, 0, [], error);
+        return new MinecraftServerStatus(false, 0, 0, [], error, 0, "", "");
     }
 
     public string ToDisplayText()
@@ -195,7 +241,7 @@ internal sealed record MinecraftServerStatus(bool IsAvailable, int Online, int M
 
         var capacity = Max > 0 ? $"/{Max}" : "";
         if (Sample.Count == 0)
-            return $"Online: {Online}{capacity}";
+            return $"Online: {Online}{capacity} | {LatencyMs}ms";
 
         var visibleNames = string.Join(", ", Sample.Take(4));
         var suffix = Online > Sample.Count ? "..." : "";
@@ -207,10 +253,23 @@ internal sealed record MinecraftServerStatus(bool IsAvailable, int Online, int M
         if (!IsAvailable)
             return Error;
 
-        if (Sample.Count == 0)
-            return "O servidor nao enviou a lista de nomes, apenas a quantidade online.";
+        var lines = new List<string>
+        {
+            $"Online: {Online}/{Max}",
+            $"Ping: {LatencyMs}ms"
+        };
 
-        return string.Join(Environment.NewLine, Sample);
+        if (!string.IsNullOrWhiteSpace(VersionName))
+            lines.Add($"Versao: {VersionName}");
+
+        if (!string.IsNullOrWhiteSpace(Motd))
+            lines.Add($"MOTD: {Motd}");
+
+        lines.Add(Sample.Count == 0
+            ? "O servidor nao enviou nomes, apenas a quantidade online."
+            : $"Players: {string.Join(", ", Sample)}");
+
+        return string.Join(Environment.NewLine, lines);
     }
 }
 

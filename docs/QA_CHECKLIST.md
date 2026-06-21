@@ -19,13 +19,19 @@ Use este checklist antes de mandar uma nova versao para os players.
 - Botao `Opcoes` abre e salva RAM/resolucao.
 - Botao `Diagnostico` abre e mostra sistema, memoria, Java, Fabric e pack.
 - Botao `Gerar ZIP` no diagnostico cria pacote de suporte.
+- ZIP de suporte inclui `telemetry.jsonl` e logs recentes.
+- Botao `Verificar` checa integridade sem baixar arquivos.
 - Preset `PC fraco` salva corretamente.
 - Preset `Equilibrado` salva corretamente.
 - Preset `Alto desempenho` salva corretamente.
+- Perfil de resourcepacks `Leve` remove/ignora resourcepacks pesados.
+- Perfil de resourcepacks `Completo` volta a baixar todos os resourcepacks.
 - Conferir que o perfil escolhido aplica preset no `options.txt` apos preparar o jogo.
 - Botao `Relatorio` gera arquivo, copia texto e abre Discord.
 - Botao `Reparar` reinstala Fabric e revalida o pack sem apagar mundos.
+- Reparo cria backup em `.cobblemonlegacy\backups`.
 - Botao `Atualizar` aparece quando existir release nova.
+- Botao `Atualizar` nao instala se o Minecraft estiver aberto.
 
 ## Pack
 
@@ -45,6 +51,7 @@ Use este checklist antes de mandar uma nova versao para os players.
 ## Seguranca
 
 - Rodar Microsoft Defender no instalador.
+- Confirmar que o instalador gera log do Inno Setup quando executado.
 - Conferir SHA256 do instalador publicado.
 - Publicar `SECURITY_SCAN_REPORT.md` na release.
 - Testar download em navegador com SmartScreen.
