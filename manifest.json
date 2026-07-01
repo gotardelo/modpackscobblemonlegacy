@@ -1,6 +1,6 @@
 ﻿{
     "name":  "Cobblemon Legacy",
-    "version":  "1.0.0",
+    "version":  "1.0.1",
     "minecraftVersion":  "1.21.1",
     "fabricLoaderVersion":  "latest",
     "files":  [
@@ -639,6 +639,13 @@
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/sophisticatedcore-1.21.1-1.2.9.21.168.1.jar",
                       "sha256":  "3c71a04d5b03cdf9d9fe50e71849fdf11291dd1fab149621e35688ef6e516054",
                       "size":  2996065,
+                      "required":  true
+                  },
+                  {
+                      "path":  "mods/spark-1.10.109-fabric (2).jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/spark-1.10.109-fabric.2.jar",
+                      "sha256":  "fafc121ac53dab1c32e74b7a1cae47d54435ba4cbeeda1180dc96675a7757047",
+                      "size":  3609981,
                       "required":  true
                   },
                   {
