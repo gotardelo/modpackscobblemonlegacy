@@ -159,18 +159,25 @@ public partial class OptionsWindow : Window
 
     private void BrowseJavaButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog
+        try
         {
-            Title = "Escolha java.exe ou javaw.exe",
-            Filter = "Java (java.exe; javaw.exe)|java.exe;javaw.exe|Executaveis (*.exe)|*.exe|Todos os arquivos (*.*)|*.*",
-            InitialDirectory = GetInitialDirectory(JavaPathTextBox.Text)
-        };
+            var dialog = new OpenFileDialog
+            {
+                Title = "Escolha java.exe ou javaw.exe",
+                Filter = "Java (java.exe; javaw.exe)|java.exe;javaw.exe|Executaveis (*.exe)|*.exe|Todos os arquivos (*.*)|*.*",
+                InitialDirectory = GetInitialDirectory(JavaPathTextBox.Text)
+            };
 
-        if (dialog.ShowDialog(this) == true)
+            if (dialog.ShowDialog(this) == true)
+            {
+                UseIntegratedJavaCheckBox.IsChecked = false;
+                JavaPathTextBox.Text = dialog.FileName;
+                UpdateJavaControls();
+            }
+        }
+        catch (Exception ex)
         {
-            UseIntegratedJavaCheckBox.IsChecked = false;
-            JavaPathTextBox.Text = dialog.FileName;
-            UpdateJavaControls();
+            MessageBox.Show(this, $"Nao foi possivel abrir o seletor de Java: {ex.Message}", "Cobblemon Legacy", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

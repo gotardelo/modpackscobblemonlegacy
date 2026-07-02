@@ -16,10 +16,17 @@ public partial class NewsWindow : Window
 
     private void DiscordButton_Click(object sender, RoutedEventArgs e)
     {
-        Process.Start(new ProcessStartInfo("https://discord.gg/sETS2Fc7Ey")
+        try
         {
-            UseShellExecute = true
-        });
+            Process.Start(new ProcessStartInfo("https://discord.gg/sETS2Fc7Ey")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Nao foi possivel abrir o Discord: {ex.Message}", "Cobblemon Legacy", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)

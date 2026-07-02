@@ -279,6 +279,11 @@ public partial class MainWindow : Window
             case LauncherPrimaryAction.Ready:
                 await PlayAsync();
                 break;
+            default:
+                SetStatus(isBusy
+                    ? "Aguarde a operacao atual terminar."
+                    : "O botao JOGAR ainda nao esta liberado. Escolha uma conta e aguarde a verificacao do pack.");
+                break;
         }
     }
 
@@ -531,8 +536,17 @@ public partial class MainWindow : Window
 
     private async Task RepairInstallationAsync()
     {
-        if (isBusy || settings is null)
+        if (isBusy)
+        {
+            SetStatus("Aguarde a operacao atual terminar antes de reparar.");
             return;
+        }
+
+        if (settings is null)
+        {
+            SetStatus("Configuracao ainda nao carregada.");
+            return;
+        }
 
         var result = MessageBox.Show(
             this,
@@ -651,7 +665,10 @@ public partial class MainWindow : Window
                 return;
 
             if (isBusy)
+            {
+                SetStatus("Aguarde a operacao atual terminar antes de trocar a conta.");
                 return;
+            }
 
             SetBusy(true);
             ProgressBar.IsIndeterminate = true;
@@ -697,8 +714,7 @@ public partial class MainWindow : Window
 
     private void CopyIpButton_Click(object sender, RoutedEventArgs e)
     {
-        Clipboard.SetText(LauncherRuntime.ServerIp);
-        SetStatus("IP copiado.");
+        TryCopyToClipboard(LauncherRuntime.ServerIp, "IP copiado.");
     }
 
     private async Task<MSession> SignInWithMicrosoftAsync()
@@ -759,7 +775,7 @@ public partial class MainWindow : Window
                 LogTextBox.Text,
                 StatusText.Text);
 
-            Clipboard.SetText(package.Text);
+            TryCopyToClipboard(package.Text, "Relatorio copiado.");
             OpenFileLocation(package.ZipPath);
             OpenExternalUrl("https://discord.gg/sETS2Fc7Ey");
             SetStatus("Pacote ZIP criado, relatorio copiado e Discord aberto para suporte.");
@@ -797,8 +813,17 @@ public partial class MainWindow : Window
 
     private async void VerifyButton_Click(object sender, RoutedEventArgs e)
     {
-        if (isBusy || settings is null)
+        if (isBusy)
+        {
+            SetStatus("Aguarde a operacao atual terminar antes de verificar.");
             return;
+        }
+
+        if (settings is null)
+        {
+            SetStatus("Configuracao ainda nao carregada.");
+            return;
+        }
 
         try
         {
@@ -835,8 +860,17 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (settings is null || isBusy)
+            if (isBusy)
+            {
+                SetStatus("Aguarde a operacao atual terminar antes de abrir as opcoes.");
                 return;
+            }
+
+            if (settings is null)
+            {
+                SetStatus("Configuracao ainda nao carregada.");
+                return;
+            }
 
             var dialog = new OptionsWindow(settings)
             {
@@ -868,6 +902,7 @@ public partial class MainWindow : Window
             {
                 UseShellExecute = true
             });
+            SetStatus("Link aberto no navegador.");
         }
         catch (Exception ex)
         {
@@ -877,8 +912,17 @@ public partial class MainWindow : Window
 
     private async void UpdateLauncherButton_Click(object sender, RoutedEventArgs e)
     {
-        if (availableUpdate is null || isBusy)
+        if (isBusy)
+        {
+            SetStatus("Aguarde a operacao atual terminar antes de atualizar o launcher.");
             return;
+        }
+
+        if (availableUpdate is null)
+        {
+            SetStatus("Nenhuma atualizacao do launcher disponivel no momento.");
+            return;
+        }
 
         if (runningMinecraftProcess is not null && !runningMinecraftProcess.HasExited)
         {
@@ -973,7 +1017,12 @@ public partial class MainWindow : Window
     private void NewsLinkButton_Click(object sender, RoutedEventArgs e)
     {
         if (!string.IsNullOrWhiteSpace(currentNews?.Url))
+        {
             OpenExternalUrl(currentNews.Url);
+            return;
+        }
+
+        SetStatus("Este aviso nao possui link externo.");
     }
 
     private static string BuildUpdatePrompt(LauncherUpdateInfo update)
@@ -1001,12 +1050,19 @@ public partial class MainWindow : Window
 
     private void NewsAllButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new NewsWindow(newsFeed ?? new LauncherNewsFeed())
+        try
         {
-            Owner = this
-        };
+            var dialog = new NewsWindow(newsFeed ?? new LauncherNewsFeed())
+            {
+                Owner = this
+            };
 
-        dialog.ShowDialog();
+            dialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Nao foi possivel abrir os avisos: {ex.Message}");
+        }
     }
 
     private void OpenFileLocation(string path)
@@ -1020,9 +1076,35 @@ public partial class MainWindow : Window
         }
         catch
         {
-            var directory = Path.GetDirectoryName(path);
-            if (!string.IsNullOrWhiteSpace(directory))
-                Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+            try
+            {
+                var directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+                {
+                    Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowError($"Nao foi possivel abrir a pasta: {ex.Message}");
+                return;
+            }
+
+            ShowError("Nao foi possivel abrir a pasta do arquivo.");
+        }
+    }
+
+    private void TryCopyToClipboard(string text, string successMessage)
+    {
+        try
+        {
+            Clipboard.SetText(text);
+            SetStatus(successMessage);
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Nao foi possivel copiar para a area de transferencia: {ex.Message}");
         }
     }
 

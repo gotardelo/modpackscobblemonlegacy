@@ -26,8 +26,7 @@ public partial class DiagnosticsWindow : Window
 
     private void CopyButton_Click(object sender, RoutedEventArgs e)
     {
-        Clipboard.SetText(BuildPlainText());
-        StatusText.Text = "Diagnostico copiado para a area de transferencia.";
+        TryCopyToClipboard(BuildPlainText(), "Diagnostico copiado para a area de transferencia.");
     }
 
     private async void CreatePackageButton_Click(object sender, RoutedEventArgs e)
@@ -36,7 +35,7 @@ public partial class DiagnosticsWindow : Window
         {
             StatusText.Text = "Gerando pacote ZIP...";
             var package = await createSupportPackage();
-            Clipboard.SetText(package.Text);
+            TryCopyToClipboard(package.Text, "Relatorio copiado para a area de transferencia.");
             OpenFileLocation(package.ZipPath);
             StatusText.Text = "Pacote ZIP criado, relatorio copiado e pasta aberta.";
         }
@@ -54,18 +53,7 @@ public partial class DiagnosticsWindow : Window
 
     private void DiscordButton_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            Process.Start(new ProcessStartInfo("https://discord.gg/sETS2Fc7Ey")
-            {
-                UseShellExecute = true
-            });
-            StatusText.Text = "Discord aberto para suporte.";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"Nao foi possivel abrir Discord: {ex.Message}";
-        }
+        OpenExternalUrl("https://discord.gg/sETS2Fc7Ey", "Discord aberto para suporte.");
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -98,9 +86,47 @@ public partial class DiagnosticsWindow : Window
         }
         catch
         {
-            var directory = Path.GetDirectoryName(path);
-            if (!string.IsNullOrWhiteSpace(directory))
-                Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+            try
+            {
+                var directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+                    Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+            }
+            catch
+            {
+                // The caller already keeps the support package path in the status/log context.
+            }
+        }
+    }
+
+    private void TryCopyToClipboard(string text, string successMessage)
+    {
+        try
+        {
+            Clipboard.SetText(text);
+            StatusText.Text = successMessage;
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Nao foi possivel copiar: {ex.Message}";
+            MessageBox.Show(this, StatusText.Text, "Cobblemon Legacy", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OpenExternalUrl(string url, string successMessage)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url)
+            {
+                UseShellExecute = true
+            });
+            StatusText.Text = successMessage;
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Nao foi possivel abrir link: {ex.Message}";
+            MessageBox.Show(this, StatusText.Text, "Cobblemon Legacy", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 }
