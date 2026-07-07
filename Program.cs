@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.3.1";
+    public const string LauncherVersion = "1.3.2";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -1844,16 +1844,51 @@ internal static class ManagedFileSynchronizer
         var reused = 0;
         var downloaded = 0;
         var skipped = 0;
+        var totalPackBytes = entries.Sum(entry => Math.Max(0, entry.File.Size ?? 0));
+        long progressedPackBytes = 0;
         var totalResourcepacks = manifest.Files.Count(file => file.Path.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase));
         var enabledResourcepacks = entries.Count(entry => entry.RelativePath.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase));
         log?.Invoke($"Resourcepacks: perfil {ResourcepackProfiles.ToDisplayName(resourcepackProfile)} ({enabledResourcepacks}/{totalResourcepacks}).");
         log?.Invoke($"Verificando pack com {parallelDownloads} download(s) paralelo(s).");
+
+        void ReportPackProgress(long delta)
+        {
+            if (delta <= 0 || totalPackBytes <= 0)
+                return;
+
+            var current = Interlocked.Add(ref progressedPackBytes, delta);
+            byteProgress?.Invoke(Math.Min(current, totalPackBytes), totalPackBytes);
+        }
+
+        void ReportRemainingEntryProgress(ManagedFile file, long entryProgress)
+        {
+            if (file.Size is not > 0)
+                return;
+
+            var remaining = file.Size.Value - entryProgress;
+            if (remaining > 0)
+                ReportPackProgress(remaining);
+        }
 
         await Task.WhenAll(entries.Select(async entry =>
         {
             await semaphore.WaitAsync();
             try
             {
+                long entryProgress = 0;
+                Action<long, long>? entryByteProgress = totalPackBytes > 0
+                    ? (current, _) =>
+                    {
+                        var safeCurrent = Math.Max(0, current);
+                        var delta = safeCurrent - entryProgress;
+                        if (delta <= 0)
+                            return;
+
+                        entryProgress = safeCurrent;
+                        ReportPackProgress(delta);
+                    }
+                    : null;
+
                 var result = await EnsureFileAsync(
                     http,
                     gameDir,
@@ -1861,17 +1896,20 @@ internal static class ManagedFileSynchronizer
                     entry.File,
                     canTrustInstalledFiles && previousManagedFiles.Contains(entry.RelativePath),
                     log,
-                    entries.Length == 1 ? byteProgress : null);
+                    entryByteProgress);
 
                 switch (result)
                 {
                     case ManagedFileSyncResult.Reused:
+                        ReportRemainingEntryProgress(entry.File, entryProgress);
                         Interlocked.Increment(ref reused);
                         break;
                     case ManagedFileSyncResult.Downloaded:
+                        ReportRemainingEntryProgress(entry.File, entryProgress);
                         Interlocked.Increment(ref downloaded);
                         break;
                     case ManagedFileSyncResult.Skipped:
+                        ReportRemainingEntryProgress(entry.File, entryProgress);
                         Interlocked.Increment(ref skipped);
                         break;
                 }

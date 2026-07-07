@@ -1,8 +1,8 @@
 ﻿{
     "name":  "Cobblemon Legacy",
-    "version":  "1.0.3",
+    "version":  "1.0.4",
     "minecraftVersion":  "1.21.1",
-    "fabricLoaderVersion":  "0.16.14",
+    "fabricLoaderVersion":  "0.19.3",
     "files":  [
                   {
                       "path":  "mods/accessories-fabric-1.1.0-beta.53+1.21.1 (3).jar",
