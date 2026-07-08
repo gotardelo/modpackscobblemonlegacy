@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.3.8";
+    public const string LauncherVersion = "1.3.9";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -252,6 +252,7 @@ internal static class LauncherRuntime
         if (!process.Start())
             throw new InvalidOperationException("O processo do Minecraft nao iniciou.");
 
+        TryBoostMinecraftProcess(process, log);
         BeginMinecraftOutputRead(process, log);
         process.EnableRaisingEvents = true;
         process.Exited += (_, _) =>
@@ -270,6 +271,19 @@ internal static class LauncherRuntime
         };
 
         return process;
+    }
+
+    private static void TryBoostMinecraftProcess(System.Diagnostics.Process process, Action<string>? log)
+    {
+        try
+        {
+            process.PriorityClass = ProcessPriorityClass.AboveNormal;
+            log?.Invoke("Minecraft em prioridade alta para abrir mais rapido.");
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke($"Nao foi possivel ajustar prioridade do Minecraft: {ex.Message}");
+        }
     }
 
     public static async Task<string> GetLatestMinecraftLogHintAsync(string gameDir)

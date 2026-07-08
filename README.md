@@ -92,7 +92,7 @@ Para gerar instalador `.exe`, abra `installer\CobblemonLegacy.iss` no Inno Setup
 Tambem existe um script de release local:
 
 ```powershell
-.\tools\Publish-LauncherRelease.ps1 -Version "1.3.8"
+.\tools\Publish-LauncherRelease.ps1 -Version "1.3.9"
 ```
 
 ## Login

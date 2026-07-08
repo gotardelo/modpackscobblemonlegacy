@@ -680,32 +680,12 @@
                                     Background="#68BDEBFF"
                                     Opacity="0.65" />
 
-                            <Grid Grid.Row="0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="SERVIDOR"
-                                           Foreground="{StaticResource CyanBrush}"
-                                           FontSize="11"
-                                           FontWeight="Black"
-                                           VerticalAlignment="Center" />
-                                <Border HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        Padding="8,1"
-                                        CornerRadius="5"
-                                        Background="#3624E6FF"
-                                        BorderBrush="#6A4BE7FF"
-                                        BorderThickness="1">
-                                    <TextBlock x:Name="ServerPlayersText"
-                                               Text="Online: consultando..."
-                                               Foreground="#72E7FF"
-                                               FontSize="11"
-                                               FontWeight="Bold"
-                                               TextTrimming="CharacterEllipsis"
-                                               MaxWidth="195" />
-                                </Border>
-                            </Grid>
+                            <TextBlock Grid.Row="0"
+                                       Text="STATUS DO SERVIDOR"
+                                       Foreground="{StaticResource CyanBrush}"
+                                       FontSize="11"
+                                       FontWeight="Black"
+                                       VerticalAlignment="Center" />
 
                             <Grid Grid.Row="1" Margin="0,1,0,0">
                                 <Grid.ColumnDefinitions>
@@ -713,9 +693,10 @@
                                     <ColumnDefinition Width="9" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="enx-cirion-16.enx.host:10068"
+                                <TextBlock x:Name="ServerPlayersText"
+                                           Text="Online: consultando..."
                                            Foreground="#FFFFFF"
-                                           FontSize="16"
+                                           FontSize="17"
                                            FontWeight="Black"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis"

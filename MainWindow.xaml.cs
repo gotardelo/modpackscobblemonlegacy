@@ -577,6 +577,38 @@ public partial class MainWindow : Window
         });
 
         var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
+        if (launchAfterUpdate)
+        {
+            SetStatus("Conferindo pack...");
+            var readiness = await LauncherRuntime.CheckPackReadinessAsync(gameDir, activeManifest, LauncherRuntime.JsonOptions, settings.ResourcepackProfile);
+            if (readiness.IsReady)
+            {
+                var installedVersionId = FabricProfileInstaller.FindInstalledVersionId(
+                    gameDir,
+                    activeManifest.MinecraftVersion,
+                    activeManifest.FabricLoaderVersion);
+
+                if (!string.IsNullOrWhiteSpace(installedVersionId))
+                {
+                    await MinecraftProfileConfigurator.ConfigureAsync(gameDir, settings, SetStatus);
+                    ProgressBar.IsIndeterminate = false;
+                    ProgressBar.Value = 100;
+                    ProgressPercentText.Text = "100%";
+                    SetIntegrityStatus($"Integridade: {activeManifest.Files.Count} arquivos verificados.");
+                    SetStatus("Pack pronto. Abrindo jogo...");
+                    LauncherRuntime.WriteTelemetry("pack_update_skipped_ready", new Dictionary<string, object?>
+                    {
+                        ["manifestVersion"] = activeManifest.Version,
+                        ["seconds"] = Math.Round(stopwatch.Elapsed.TotalSeconds, 1)
+                    });
+
+                    return installedVersionId;
+                }
+            }
+
+            SetStatus($"Atualizando pack: {readiness.Message}");
+        }
+
         var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
 
         var versionId = await LauncherRuntime.InstallOrUpdateAsync(http, launcher, activeManifest, gameDir, settings.ResourcepackProfile, SetStatus, SetByteProgress);
