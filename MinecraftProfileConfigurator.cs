@@ -7,7 +7,7 @@ namespace CobblemonLegacy;
 
 internal static class MinecraftProfileConfigurator
 {
-    private const int CurrentPerformancePresetVersion = 4;
+    private const int CurrentPerformancePresetVersion = 5;
 
     public static async Task ConfigureAsync(
         string gameDir,

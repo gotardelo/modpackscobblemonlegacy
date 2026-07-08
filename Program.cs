@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.3.3";
+    public const string LauncherVersion = "1.3.4";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -392,6 +392,35 @@ internal static class LauncherRuntime
         };
     }
 
+    public static GameWindowSize GetRecommendedGameWindowSize()
+    {
+        var screen = TryGetPrimaryScreenSize();
+        var tier = GetPerformanceTier();
+        var target = tier switch
+        {
+            PerformanceTier.LowEnd => new GameWindowSize(854, 480),
+            PerformanceTier.Balanced => new GameWindowSize(1280, 720),
+            _ => new GameWindowSize(1366, 768)
+        };
+
+        if (screen is null)
+            return target;
+
+        var maxWidth = Math.Max(640, (int)(screen.Value.Width * 0.82));
+        var maxHeight = Math.Max(360, (int)(screen.Value.Height * 0.78));
+        var width = Math.Min(target.Width, maxWidth);
+        var height = Math.Min(target.Height, maxHeight);
+
+        if (width < target.Width || height < target.Height)
+        {
+            var scale = Math.Min(width / (double)target.Width, height / (double)target.Height);
+            width = Math.Max(640, RoundToEven((int)(target.Width * scale)));
+            height = Math.Max(360, RoundToEven((int)(target.Height * scale)));
+        }
+
+        return new GameWindowSize(width, height);
+    }
+
     private static int GetRecommendedMaximumRamMb(int totalMemoryMb)
     {
         return totalMemoryMb switch
@@ -465,8 +494,23 @@ internal static class LauncherRuntime
 
     private sealed record PhysicalMemoryInfo(int TotalMb, int AvailableMb);
 
+    private static GameWindowSize? TryGetPrimaryScreenSize()
+    {
+        var width = GetSystemMetrics(0);
+        var height = GetSystemMetrics(1);
+        return width > 0 && height > 0 ? new GameWindowSize(width, height) : null;
+    }
+
+    private static int RoundToEven(int value)
+    {
+        return value % 2 == 0 ? value : value - 1;
+    }
+
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatusEx lpBuffer);
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
 
     [StructLayout(LayoutKind.Sequential)]
     private sealed class MemoryStatusEx
@@ -1043,6 +1087,8 @@ internal enum PerformanceTier
     Standard
 }
 
+internal readonly record struct GameWindowSize(int Width, int Height);
+
 internal static class AuthModes
 {
     public const string Microsoft = "microsoft";
@@ -1144,7 +1190,7 @@ internal static class ResourcepackProfiles
 public sealed class LauncherSettings
 {
     private const int LegacyRecommendedRamMb = 8192;
-    private const int CurrentRuntimeDefaultsVersion = 4;
+    private const int CurrentRuntimeDefaultsVersion = 5;
 
     public static string SettingsPath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -1252,7 +1298,7 @@ public sealed class LauncherSettings
         loaded.AuthMode = NormalizeAuthMode(loaded.AuthMode);
         loaded.MicrosoftUsername = loaded.MicrosoftUsername?.Trim() ?? "";
         loaded.NormalizeRuntimeOptions();
-        if (loaded.ApplySafeDefaultsForWeakPc(recommendedRamMb))
+        if (loaded.ApplyAutomaticHardwareDefaults(recommendedRamMb))
             normalized = true;
 
         if (normalized)
@@ -1291,39 +1337,70 @@ public sealed class LauncherSettings
             UseIntegratedJava = true;
     }
 
-    private bool ApplySafeDefaultsForWeakPc(int recommendedRamMb)
+    private bool ApplyAutomaticHardwareDefaults(int recommendedRamMb)
     {
         if (PerformancePresetVersion >= CurrentRuntimeDefaultsVersion)
             return false;
 
-        if (LauncherRuntime.GetPerformanceTier() != PerformanceTier.LowEnd)
-            return false;
-
+        var tier = LauncherRuntime.GetPerformanceTier();
+        var windowSize = LauncherRuntime.GetRecommendedGameWindowSize();
         var changed = false;
-        if (string.Equals(PerformanceProfile, PerformanceProfiles.Auto, StringComparison.OrdinalIgnoreCase))
+
+        if (WindowWidth != windowSize.Width)
         {
-            PerformanceProfile = PerformanceProfiles.Low;
+            WindowWidth = windowSize.Width;
             changed = true;
         }
 
-        if (string.Equals(ResourcepackProfile, ResourcepackProfiles.Full, StringComparison.OrdinalIgnoreCase))
+        if (WindowHeight != windowSize.Height)
         {
-            ResourcepackProfile = ResourcepackProfiles.Essential;
+            WindowHeight = windowSize.Height;
             changed = true;
         }
 
-        if (!CompatibilityMode)
+        if (FullScreen && tier != PerformanceTier.Standard)
         {
-            CompatibilityMode = true;
+            FullScreen = false;
             changed = true;
         }
 
-        var safeRam = Math.Clamp(recommendedRamMb, 2048, 3072);
-        if (MaximumRamMb > safeRam)
+        if (MaximumRamMb != recommendedRamMb && (MaximumRamMb <= 0 || MaximumRamMb == LegacyRecommendedRamMb || MaximumRamMb > recommendedRamMb))
         {
-            MaximumRamMb = safeRam;
+            MaximumRamMb = recommendedRamMb;
             changed = true;
         }
+
+        if (tier == PerformanceTier.LowEnd)
+        {
+            if (string.Equals(PerformanceProfile, PerformanceProfiles.Auto, StringComparison.OrdinalIgnoreCase))
+            {
+                PerformanceProfile = PerformanceProfiles.Low;
+                changed = true;
+            }
+
+            if (string.Equals(ResourcepackProfile, ResourcepackProfiles.Full, StringComparison.OrdinalIgnoreCase))
+            {
+                ResourcepackProfile = ResourcepackProfiles.Essential;
+                changed = true;
+            }
+
+            if (!CompatibilityMode)
+            {
+                CompatibilityMode = true;
+                changed = true;
+            }
+        }
+        else if (tier == PerformanceTier.Balanced)
+        {
+            if (string.Equals(ResourcepackProfile, ResourcepackProfiles.Full, StringComparison.OrdinalIgnoreCase))
+            {
+                ResourcepackProfile = ResourcepackProfiles.Balanced;
+                changed = true;
+            }
+        }
+
+        if (changed)
+            PerformancePresetVersion = 0;
 
         return changed;
     }
