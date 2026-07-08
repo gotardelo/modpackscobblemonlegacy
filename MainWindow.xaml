@@ -335,9 +335,10 @@
         <Grid>
             <Image Source="Assets/launcher-hero-premium.png"
                    Stretch="UniformToFill"
-                   Opacity="0.94" />
+                   Opacity="0.94"
+                   IsHitTestVisible="False" />
 
-            <Rectangle>
+            <Rectangle IsHitTestVisible="False">
                 <Rectangle.Fill>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                         <GradientStop Color="#AE000205" Offset="0" />
@@ -357,12 +358,16 @@
                        Fill="#D0000000"
                        IsHitTestVisible="False" />
 
-            <Grid MouseLeftButtonDown="WindowChrome_MouseLeftButtonDown">
+            <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="118" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="90" />
                 </Grid.RowDefinitions>
+
+                <Border Grid.Row="0"
+                        Background="Transparent"
+                        MouseLeftButtonDown="WindowChrome_MouseLeftButtonDown" />
 
                 <Border Grid.Row="0"
                         Height="2"
@@ -376,21 +381,22 @@
                 <StackPanel Grid.Row="0"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            Margin="0,4,0,0">
+                            Margin="0,3,0,0"
+                            IsHitTestVisible="False">
                     <TextBlock Text="COBBLEMON"
                                Foreground="#EAFEFF"
                                FontFamily="{StaticResource GameDisplayFont}"
-                               FontSize="46"
+                               FontSize="43"
                                FontWeight="Black"
                                TextAlignment="Center"
                                Effect="{StaticResource LogoShadow}" />
                     <TextBlock Text="LEGACY"
                                Foreground="#9FF7FF"
                                FontFamily="{StaticResource GameDisplayFont}"
-                               FontSize="37"
+                               FontSize="34"
                                FontWeight="Black"
                                TextAlignment="Center"
-                               Margin="0,-11,0,0"
+                               Margin="0,-10,0,0"
                                Effect="{StaticResource TitleShadow}" />
                 </StackPanel>
 
@@ -398,30 +404,10 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"
                             Margin="0,6,8,0">
-                    <Button x:Name="UpdateLauncherButton"
-                            Content="Atualizar"
-                            Style="{StaticResource TopUpdateButton}"
-                            Margin="0,0,8,0"
-                            Visibility="Collapsed"
-                            Click="UpdateLauncherButton_Click" />
-                    <Button Content="Diagnostico"
-                            Style="{StaticResource TopOptionsButton}"
-                            Width="104"
-                            Margin="0,0,8,0"
-                            Click="DiagnosticsButton_Click" />
-                    <Button Content="Verificar"
-                            Style="{StaticResource TopOptionsButton}"
-                            Width="92"
-                            Margin="0,0,8,0"
-                            Click="VerifyButton_Click" />
-                    <Button Content="Opcoes"
-                            Style="{StaticResource TopOptionsButton}"
-                            Margin="0,0,8,0"
-                            Click="OptionsButton_Click" />
-                    <Button Content="–"
+                    <Button Content="-"
                             Style="{StaticResource ChromeButton}"
                             Click="MinimizeButton_Click" />
-                    <Button Content="×"
+                    <Button Content="X"
                             Style="{StaticResource ChromeButton}"
                             Click="CloseButton_Click" />
                 </StackPanel>
@@ -662,7 +648,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="442" />
+                        <ColumnDefinition Width="590" />
                     </Grid.ColumnDefinitions>
 
                     <Border CornerRadius="7"
@@ -695,6 +681,10 @@
                                     Opacity="0.65" />
 
                             <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
                                 <TextBlock Text="SERVIDOR"
                                            Foreground="{StaticResource CyanBrush}"
                                            FontSize="11"
@@ -713,13 +703,13 @@
                                                FontSize="11"
                                                FontWeight="Bold"
                                                TextTrimming="CharacterEllipsis"
-                                               MaxWidth="250" />
+                                               MaxWidth="195" />
                                 </Border>
                             </Grid>
 
                             <Grid Grid.Row="1" Margin="0,1,0,0">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="9" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -728,6 +718,7 @@
                                            FontSize="16"
                                            FontWeight="Black"
                                            VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
                                            Effect="{StaticResource TitleShadow}" />
                                 <Button Grid.Column="2"
                                         Content="Copiar IP"
@@ -799,42 +790,55 @@
                                        HorizontalAlignment="Right"
                                        VerticalAlignment="Center"
                                        TextTrimming="CharacterEllipsis"
-                                       MaxWidth="205" />
+                                       MaxWidth="330" />
 
-                            <StackPanel Grid.Row="1"
-                                        Orientation="Horizontal"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center">
-                                <Button Content="Opcoes"
-                                        Width="78"
+                            <WrapPanel Grid.Row="1"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center">
+                                <Button x:Name="UpdateLauncherButton"
+                                        Content="Atualizar"
+                                        Width="92"
                                         MinWidth="0"
                                         Style="{StaticResource FooterLinkButton}"
-                                        Click="OptionsButton_Click" />
+                                        Margin="0,0,5,0"
+                                        Visibility="Collapsed"
+                                        Click="UpdateLauncherButton_Click" />
+                                <Button Content="Verificar"
+                                        Width="77"
+                                        MinWidth="0"
+                                        Style="{StaticResource FooterLinkButton}"
+                                        Margin="0,0,5,0"
+                                        Click="VerifyButton_Click" />
                                 <Button Content="Reparar"
-                                        Width="78"
+                                        Width="72"
                                         MinWidth="0"
                                         Style="{StaticResource FooterLinkButton}"
-                                        Margin="8,0,0,0"
+                                        Margin="0,0,5,0"
                                         Click="RepairButton_Click" />
+                                <Button Content="Opcoes"
+                                        Width="72"
+                                        MinWidth="0"
+                                        Style="{StaticResource FooterLinkButton}"
+                                        Margin="0,0,5,0"
+                                        Click="OptionsButton_Click" />
                                 <Button Content="Relatorio"
                                         Width="78"
                                         MinWidth="0"
                                         Style="{StaticResource FooterLinkButton}"
-                                        Margin="8,0,0,0"
+                                        Margin="0,0,5,0"
                                         Click="CrashReportButton_Click" />
                                 <Button Content="Discord"
-                                        Width="78"
+                                        Width="74"
                                         MinWidth="0"
                                         Style="{StaticResource FooterLinkButton}"
-                                        Margin="8,0,0,0"
+                                        Margin="0,0,5,0"
                                         Click="DiscordButton_Click" />
                                 <Button Content="Site"
-                                        Width="78"
+                                        Width="58"
                                         MinWidth="0"
                                         Style="{StaticResource FooterLinkButton}"
-                                        Margin="8,0,0,0"
                                         Click="WebsiteButton_Click" />
-                            </StackPanel>
+                            </WrapPanel>
 
                             <TextBlock x:Name="RamText"
                                        Grid.Row="2"
