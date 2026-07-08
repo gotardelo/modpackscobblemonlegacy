@@ -811,7 +811,12 @@ public partial class MainWindow : Window
             throw new InvalidOperationException("Defina um nickname valido antes de jogar.");
         }
 
-        return MSession.CreateOfflineSession(settings.OfflineUsername);
+        var offlineSession = MSession.CreateOfflineSession(settings.OfflineUsername);
+        offlineSession.UserType = "legacy";
+        offlineSession.AccessToken = "0";
+        offlineSession.ClientToken = "";
+        offlineSession.Xuid = "";
+        return offlineSession;
     }
 
     private async Task SaveOfflineNicknameIfNeededAsync()
