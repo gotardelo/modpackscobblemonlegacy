@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.4.1";
+    public const string LauncherVersion = "1.4.2";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -2027,6 +2027,12 @@ internal static class ManagedFileSynchronizer
                 return false;
         }
 
+        if (HasUnexpectedManagedFolderFiles(gameDir, "mods", expectedPaths))
+            return false;
+
+        if (HasUnexpectedManagedFolderFiles(gameDir, "resourcepacks", expectedPaths))
+            return false;
+
         return true;
     }
 
@@ -2208,6 +2214,29 @@ internal static class ManagedFileSynchronizer
         }
 
         return removed;
+    }
+
+    private static bool HasUnexpectedManagedFolderFiles(
+        string gameDir,
+        string folderName,
+        HashSet<string> expectedPaths)
+    {
+        var folderPath = ResolveGamePath(gameDir, folderName);
+        if (!Directory.Exists(folderPath))
+            return false;
+
+        foreach (var file in Directory.EnumerateFiles(folderPath, "*", SearchOption.TopDirectoryOnly))
+        {
+            var fileName = Path.GetFileName(file);
+            if (fileName is ".gitkeep" or ".DS_Store" or "Thumbs.db")
+                continue;
+
+            var relativePath = NormalizeRelativePath($"{folderName}/{fileName}");
+            if (!expectedPaths.Contains(relativePath))
+                return true;
+        }
+
+        return false;
     }
 
     private static async Task<ManagedFileSyncResult> EnsureFileAsync(
