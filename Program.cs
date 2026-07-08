@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.3.5";
+    public const string LauncherVersion = "1.3.6";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -1970,7 +1970,7 @@ internal static class ManagedFileSynchronizer
         long progressedPackBytes = 0;
         var totalResourcepacks = manifest.Files.Count(file => file.Path.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase));
         var enabledResourcepacks = entries.Count(entry => entry.RelativePath.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase));
-        log?.Invoke($"Resourcepacks: perfil {ResourcepackProfiles.ToDisplayName(resourcepackProfile)} ({enabledResourcepacks}/{totalResourcepacks}).");
+        log?.Invoke($"Resourcepacks: manifest completo ({enabledResourcepacks}/{totalResourcepacks}).");
         log?.Invoke($"Verificando pack com {parallelDownloads} download(s) paralelo(s).");
 
         void ReportPackProgress(long delta)
@@ -2070,6 +2070,7 @@ internal static class ManagedFileSynchronizer
         }
 
         removed += RemoveUnexpectedManagedFolderFiles(gameDir, "mods", expectedPaths, log);
+        removed += RemoveUnexpectedManagedFolderFiles(gameDir, "resourcepacks", expectedPaths, log);
 
         state.ManifestVersion = manifest.Version;
         state.ManagedFiles = expectedPaths.Order(StringComparer.OrdinalIgnoreCase).ToList();
@@ -2082,7 +2083,6 @@ internal static class ManagedFileSynchronizer
     {
         return manifest.Files
             .Select(file => new ManagedFileEntry(NormalizeRelativePath(file.Path), file))
-            .Where(entry => ResourcepackProfiles.Includes(entry.RelativePath, resourcepackProfile))
             .ToArray();
     }
 
