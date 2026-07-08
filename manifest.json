@@ -1,6 +1,6 @@
 ﻿{
     "name":  "Cobblemon Legacy",
-    "version":  "1.0.8",
+    "version":  "1.0.9",
     "minecraftVersion":  "1.21.1",
     "fabricLoaderVersion":  "0.19.3",
     "files":  [
@@ -467,13 +467,6 @@
                       "required":  true
                   },
                   {
-                      "path":  "mods/krypton-0.2.8 (2).jar",
-                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/krypton-0.2.8.2.jar",
-                      "sha256":  "94f195819b24e5da64effdc9da15cdd84836cc75e8ff0fd098bab6bc2f49e3fe",
-                      "size":  161045,
-                      "required":  true
-                  },
-                  {
                       "path":  "mods/lithostitched-1.7.13-fabric-21.1.jar",
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/lithostitched-1.7.13-fabric-21.1.jar",
                       "sha256":  "206c086604bcfea5b2862e90069470352cbf4b4d7088b55cdfa8f3452bedc270",
@@ -632,13 +625,6 @@
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/tsfitemcore-1.0.0-fabric.1.jar",
                       "sha256":  "214b263b8a04fe35b97c66c0a92c4a36b94f7168eb0d20f59592fceeaca539bf",
                       "size":  36166,
-                      "required":  true
-                  },
-                  {
-                      "path":  "mods/vmp-fabric-mc1.21.1-0.2.0+beta.7.172-all.jar",
-                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/vmp-fabric-mc1.21.1-0.2.0%2Bbeta.7.172-all.jar",
-                      "sha256":  "97a35a4388b1e7cd5325983b1e3f5f72fe7460367ef5755ae9fc9785c2930803",
-                      "size":  433667,
                       "required":  true
                   },
                   {
