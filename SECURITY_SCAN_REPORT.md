@@ -1,14 +1,14 @@
 # Cobblemon Legacy - Relatorio de seguranca
 
 Data do teste: 2026-07-08
-Launcher testado: v1.4.5
+Launcher testado: v1.4.6
 
 ## Arquivos verificados
 
 | Arquivo | Tamanho | SHA256 |
 | --- | ---: | --- |
-| `dist/CobblemonLegacyLauncherSetup.exe` | 57.026.960 bytes | `7C2C336478D6AE9D6D4A86773473C8CE3B11B3E31EC8F26EF9D2BD3C3FFBF552` |
-| `publish/win-x64/CobblemonLegacy.exe` | 180.025.227 bytes | `6EE1C22FE3110E408FEC9CAD0CCF3E440AC10EBD69760BC38D80EF9D756A96B6` |
+| `dist/CobblemonLegacyLauncherSetup.exe` | 57.028.724 bytes | `E8AA47B9CB1E8591705F015F0C84EB6D509208330D7AFDCE6AAA95B148CC0574` |
+| `publish/win-x64/CobblemonLegacy.exe` | 180.025.227 bytes | `2E4195A6DABC67815B9B4E3FEE34034D1C394ADB2CB9BA9FBCFBEBA98280BEE3` |
 
 ## Resultados
 

@@ -15,29 +15,71 @@ internal static class MinecraftProfileConfigurator
         Action<string>? log = null)
     {
         EnsureServerList(gameDir, log);
-        await SanitizeOptionsAsync(gameDir, log);
+        if (await SanitizeOptionsAsync(gameDir, log))
+            settings.PerformancePresetVersion = 0;
+
         await ApplyPerformancePresetOnceAsync(gameDir, settings, log);
     }
 
-    private static async Task SanitizeOptionsAsync(string gameDir, Action<string>? log)
+    private static async Task<bool> SanitizeOptionsAsync(string gameDir, Action<string>? log)
     {
         var optionsPath = Path.Combine(gameDir, "options.txt");
         if (!File.Exists(optionsPath))
-            return;
+            return false;
 
         var lines = await File.ReadAllLinesAsync(optionsPath, Encoding.UTF8);
+        if (ShouldResetOptions(gameDir, lines))
+        {
+            BackupOptionsFile(gameDir, optionsPath, "options-broken.txt");
+            File.Delete(optionsPath);
+            log?.Invoke("Opcoes locais quebradas detectadas. options.txt foi recriado com backup.");
+            return true;
+        }
+
         var cleaned = lines
             .Where(line => !line.Contains("key.keyboard.unknown", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         if (cleaned.Length == lines.Length)
-            return;
+            return false;
 
-        var backupDir = Path.Combine(gameDir, "backups", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
-        Directory.CreateDirectory(backupDir);
-        File.Copy(optionsPath, Path.Combine(backupDir, "options-invalid-keybinds.txt"), overwrite: true);
+        BackupOptionsFile(gameDir, optionsPath, "options-invalid-keybinds.txt");
         await File.WriteAllLinesAsync(optionsPath, cleaned, Encoding.UTF8);
         log?.Invoke($"Opcoes locais reparadas: {lines.Length - cleaned.Length} keybind invalida removida.");
+        return true;
+    }
+
+    private static bool ShouldResetOptions(string gameDir, string[] optionsLines)
+    {
+        var latestLogPath = Path.Combine(gameDir, "logs", "latest.log");
+        if (File.Exists(latestLogPath))
+        {
+            try
+            {
+                var recentLog = File.ReadLines(latestLogPath, Encoding.UTF8).TakeLast(260);
+                if (recentLog.Any(line => line.Contains("Failed to load options", StringComparison.OrdinalIgnoreCase)))
+                    return true;
+            }
+            catch
+            {
+                // Fall back to options-only checks.
+            }
+        }
+
+        var unknownKeybinds = optionsLines.Count(line => line.Contains("key.keyboard.unknown", StringComparison.OrdinalIgnoreCase));
+        if (unknownKeybinds >= 10)
+            return true;
+
+        return optionsLines.Any(line =>
+            line.StartsWith("key_", StringComparison.OrdinalIgnoreCase) &&
+            line.Contains("key.mouse.middle", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static void BackupOptionsFile(string gameDir, string optionsPath, string backupFileName)
+    {
+        var backupDir = Path.Combine(gameDir, "backups", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+        Directory.CreateDirectory(backupDir);
+        File.Copy(optionsPath, Path.Combine(backupDir, backupFileName), overwrite: true);
     }
 
     private static void EnsureServerList(string gameDir, Action<string>? log)

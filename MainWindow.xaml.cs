@@ -323,6 +323,7 @@ public partial class MainWindow : Window
             if (isClosing)
                 return;
 
+            await MinecraftProfileConfigurator.ConfigureAsync(gameDir, settings, AppendLog);
             var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
 
             SetPrimaryAction(LauncherPrimaryAction.Launching);
