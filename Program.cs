@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.4.3";
+    public const string LauncherVersion = "1.4.4";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -942,6 +942,8 @@ internal static class LauncherRuntime
             AddFileToArchiveIfExists(archive, TelemetryPath, "launcher/telemetry.jsonl");
             AddFileToArchiveIfExists(archive, ModpackManifestLoader.CachePath, "launcher/manifest-cache.json");
             AddFileToArchiveIfExists(archive, Path.Combine(gameDir, "logs", "latest.log"), "minecraft/latest.log");
+            AddFileToArchiveIfExists(archive, Path.Combine(gameDir, "options.txt"), "minecraft/options.txt");
+            AddFileToArchiveIfExists(archive, Path.Combine(gameDir, "servers.dat"), "minecraft/servers.dat");
 
             var latestCrash = FindNewestFile(Path.Combine(gameDir, "crash-reports"), "crash-*.txt");
             AddFileToArchiveIfExists(archive, latestCrash, "minecraft/latest-crash-report.txt");

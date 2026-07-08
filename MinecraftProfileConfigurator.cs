@@ -15,7 +15,29 @@ internal static class MinecraftProfileConfigurator
         Action<string>? log = null)
     {
         EnsureServerList(gameDir, log);
+        await SanitizeOptionsAsync(gameDir, log);
         await ApplyPerformancePresetOnceAsync(gameDir, settings, log);
+    }
+
+    private static async Task SanitizeOptionsAsync(string gameDir, Action<string>? log)
+    {
+        var optionsPath = Path.Combine(gameDir, "options.txt");
+        if (!File.Exists(optionsPath))
+            return;
+
+        var lines = await File.ReadAllLinesAsync(optionsPath, Encoding.UTF8);
+        var cleaned = lines
+            .Where(line => !line.Contains("key.keyboard.unknown", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        if (cleaned.Length == lines.Length)
+            return;
+
+        var backupDir = Path.Combine(gameDir, "backups", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+        Directory.CreateDirectory(backupDir);
+        File.Copy(optionsPath, Path.Combine(backupDir, "options-invalid-keybinds.txt"), overwrite: true);
+        await File.WriteAllLinesAsync(optionsPath, cleaned, Encoding.UTF8);
+        log?.Invoke($"Opcoes locais reparadas: {lines.Length - cleaned.Length} keybind invalida removida.");
     }
 
     private static void EnsureServerList(string gameDir, Action<string>? log)
