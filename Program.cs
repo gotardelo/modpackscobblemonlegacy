@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.3.2";
+    public const string LauncherVersion = "1.3.3";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -408,15 +408,20 @@ internal static class LauncherRuntime
     {
         var arguments = new List<MArgument>
         {
+            new("-XX:+UseG1GC"),
+            new("-XX:+ParallelRefProcEnabled"),
+            new("-XX:MaxGCPauseMillis=200"),
             new("-XX:+DisableExplicitGC"),
+            new("-Djava.net.preferIPv4Stack=true"),
+            new("-Dfile.encoding=UTF-8"),
             new("-Dsun.rmi.dgc.server.gcInterval=2147483646"),
             new("-Dsun.rmi.dgc.client.gcInterval=2147483646")
         };
 
         if (settings.CompatibilityMode)
         {
-            arguments.Add(new("-Djava.net.preferIPv4Stack=true"));
-            arguments.Add(new("-Dfile.encoding=UTF-8"));
+            arguments.Add(new("-Dio.netty.tryReflectionSetAccessible=true"));
+            arguments.Add(new("-Djoml.fastmath=false"));
         }
 
         var customArguments = RemoveMemoryJvmArguments(settings.ExtraJvmArguments);
@@ -1139,6 +1144,7 @@ internal static class ResourcepackProfiles
 public sealed class LauncherSettings
 {
     private const int LegacyRecommendedRamMb = 8192;
+    private const int CurrentRuntimeDefaultsVersion = 4;
 
     public static string SettingsPath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -1246,6 +1252,8 @@ public sealed class LauncherSettings
         loaded.AuthMode = NormalizeAuthMode(loaded.AuthMode);
         loaded.MicrosoftUsername = loaded.MicrosoftUsername?.Trim() ?? "";
         loaded.NormalizeRuntimeOptions();
+        if (loaded.ApplySafeDefaultsForWeakPc(recommendedRamMb))
+            normalized = true;
 
         if (normalized)
             await loaded.SaveAsync(jsonOptions);
@@ -1281,6 +1289,43 @@ public sealed class LauncherSettings
 
         if (string.IsNullOrWhiteSpace(JavaPath))
             UseIntegratedJava = true;
+    }
+
+    private bool ApplySafeDefaultsForWeakPc(int recommendedRamMb)
+    {
+        if (PerformancePresetVersion >= CurrentRuntimeDefaultsVersion)
+            return false;
+
+        if (LauncherRuntime.GetPerformanceTier() != PerformanceTier.LowEnd)
+            return false;
+
+        var changed = false;
+        if (string.Equals(PerformanceProfile, PerformanceProfiles.Auto, StringComparison.OrdinalIgnoreCase))
+        {
+            PerformanceProfile = PerformanceProfiles.Low;
+            changed = true;
+        }
+
+        if (string.Equals(ResourcepackProfile, ResourcepackProfiles.Full, StringComparison.OrdinalIgnoreCase))
+        {
+            ResourcepackProfile = ResourcepackProfiles.Essential;
+            changed = true;
+        }
+
+        if (!CompatibilityMode)
+        {
+            CompatibilityMode = true;
+            changed = true;
+        }
+
+        var safeRam = Math.Clamp(recommendedRamMb, 2048, 3072);
+        if (MaximumRamMb > safeRam)
+        {
+            MaximumRamMb = safeRam;
+            changed = true;
+        }
+
+        return changed;
     }
 
     private static string NormalizeAuthMode(string? value)

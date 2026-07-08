@@ -7,7 +7,7 @@ namespace CobblemonLegacy;
 
 internal static class MinecraftProfileConfigurator
 {
-    private const int CurrentPerformancePresetVersion = 3;
+    private const int CurrentPerformancePresetVersion = 4;
 
     public static async Task ConfigureAsync(
         string gameDir,
@@ -99,6 +99,12 @@ internal static class MinecraftProfileConfigurator
         SetOption(map, order, "biomeBlendRadius", preset.BiomeBlendRadius.ToString());
         SetOption(map, order, "maxFps", preset.MaxFps.ToString());
         SetOption(map, order, "enableVsync", "true");
+        SetOption(map, order, "ao", preset.AmbientOcclusion ? "true" : "false");
+        SetOption(map, order, "fancyGraphics", "false");
+        SetOption(map, order, "fovEffectScale", "0.0");
+        SetOption(map, order, "darknessEffectScale", "0.0");
+        SetOption(map, order, "glintSpeed", "0.0");
+        SetOption(map, order, "glintStrength", "0.25");
         SetOption(map, order, "menuBackgroundBlurriness", "0");
         SetOption(map, order, "lastServer", LauncherRuntime.ServerIp);
 
@@ -125,20 +131,21 @@ internal static class MinecraftProfileConfigurator
         int Particles,
         string EntityDistanceScaling,
         int BiomeBlendRadius,
-        int MaxFps)
+        int MaxFps,
+        bool AmbientOcclusion)
     {
         public static PerformancePreset ForProfile(string profile, PerformanceTier detectedTier)
         {
             return profile switch
             {
-                PerformanceProfiles.Low => new PerformancePreset("PC fraco", 5, 4, 0, 2, "0.5", 0, 45),
-                PerformanceProfiles.Balanced => new PerformancePreset("equilibrado", 7, 5, 1, 1, "0.7", 0, 60),
-                PerformanceProfiles.High => new PerformancePreset("alto desempenho", 10, 6, 2, 0, "0.9", 1, 120),
+                PerformanceProfiles.Low => new PerformancePreset("PC fraco", 4, 3, 0, 2, "0.45", 0, 45, false),
+                PerformanceProfiles.Balanced => new PerformancePreset("equilibrado", 6, 4, 1, 1, "0.65", 0, 60, false),
+                PerformanceProfiles.High => new PerformancePreset("alto desempenho", 10, 6, 2, 0, "0.9", 1, 120, true),
                 _ => detectedTier switch
                 {
-                    PerformanceTier.LowEnd => new PerformancePreset("automatico leve", 5, 4, 0, 2, "0.5", 0, 45),
-                    PerformanceTier.Balanced => new PerformancePreset("automatico equilibrado", 6, 4, 1, 1, "0.65", 0, 60),
-                    _ => new PerformancePreset("automatico padrao", 8, 5, 2, 1, "0.75", 1, 90)
+                    PerformanceTier.LowEnd => new PerformancePreset("automatico leve", 4, 3, 0, 2, "0.45", 0, 45, false),
+                    PerformanceTier.Balanced => new PerformancePreset("automatico equilibrado", 6, 4, 1, 1, "0.65", 0, 60, false),
+                    _ => new PerformancePreset("automatico padrao", 8, 5, 2, 1, "0.75", 1, 90, true)
                 }
             };
         }

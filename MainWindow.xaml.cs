@@ -18,7 +18,7 @@ public partial class MainWindow : Window
 {
     private const int MaxVisibleLogCharacters = 12_000;
     private const long MaxUiLogBytes = 512 * 1024;
-    private static readonly TimeSpan MinecraftStartupWatchTime = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan MinecraftStartupWatchTime = TimeSpan.FromSeconds(90);
     private static readonly Regex NicknameRegex = new("^[A-Za-z0-9_]{3,16}$", RegexOptions.Compiled);
     private static readonly string UiLogPath = Path.Combine(
         Path.GetDirectoryName(LauncherSettings.SettingsPath)!,
@@ -327,10 +327,18 @@ public partial class MainWindow : Window
             process = await LauncherRuntime.StartGameAsync(launcher, versionId, settings, session, AppendLog);
             runningMinecraftProcess = process;
             AppendLog($"Minecraft iniciado com PID {process.Id}.");
-            await WaitForMinecraftStartupAsync(process, gameDir);
+            var windowDetected = await WaitForMinecraftStartupAsync(process, gameDir);
 
-            SetStatus(GetMinecraftRunningStatus());
-            await MonitorLauncherDuringGameAsync(process);
+            if (windowDetected)
+            {
+                SetStatus(GetMinecraftRunningStatus());
+                await MonitorLauncherDuringGameAsync(process);
+            }
+            else
+            {
+                SetStatus("Minecraft ainda esta iniciando. Launcher ficara aberto ate a janela aparecer ou o jogo fechar.");
+                await WaitForGameExitWithLauncherOpenAsync(process);
+            }
             LauncherRuntime.WriteTelemetry("minecraft_closed", new Dictionary<string, object?>
             {
                 ["exitCode"] = TryGetExitCode(process),
@@ -363,16 +371,28 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task WaitForMinecraftStartupAsync(Process process, string gameDir)
+    private async Task<bool> WaitForMinecraftStartupAsync(Process process, string gameDir)
     {
         SetStatus("Minecraft iniciando... aguarde a janela abrir.");
 
-        var exitTask = process.WaitForExitAsync();
-        var startupTimer = Task.Delay(MinecraftStartupWatchTime);
-        var completedTask = await Task.WhenAny(exitTask, startupTimer);
+        var deadline = DateTime.UtcNow + MinecraftStartupWatchTime;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (process.HasExited)
+                break;
 
-        if (completedTask != exitTask)
-            return;
+            process.Refresh();
+            if (process.MainWindowHandle != IntPtr.Zero)
+                return true;
+
+            await Task.Delay(1000);
+        }
+
+        if (!process.HasExited)
+        {
+            AppendLog("Minecraft continuou rodando sem janela detectada dentro do tempo de seguranca.");
+            return false;
+        }
 
         var exitCode = TryGetExitCode(process);
         var logHint = await LauncherRuntime.GetLatestMinecraftLogHintAsync(gameDir);
