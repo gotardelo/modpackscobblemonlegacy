@@ -1,6 +1,6 @@
 ﻿{
     "name":  "Cobblemon Legacy",
-    "version":  "1.0.4",
+    "version":  "1.0.5",
     "minecraftVersion":  "1.21.1",
     "fabricLoaderVersion":  "0.19.3",
     "files":  [
@@ -296,13 +296,6 @@
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/Debugify-1.21.1%2B1.0.jar",
                       "sha256":  "e61e83875190150337a2366d9374f04865654de7bdf83e6ab29d9915899f8d7a",
                       "size":  292202,
-                      "required":  true
-                  },
-                  {
-                      "path":  "mods/DistantHorizons-3.1.2-b-1.21.1-fabric-neoforge.jar",
-                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/DistantHorizons-3.1.2-b-1.21.1-fabric-neoforge.jar",
-                      "sha256":  "5b6df1e412b093ece73bee8d2c7238743546b9dc70d06f5ea843af3e318e1887",
-                      "size":  30140037,
                       "required":  true
                   },
                   {
