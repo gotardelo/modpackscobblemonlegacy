@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.3.6";
+    public const string LauncherVersion = "1.3.7";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -512,6 +512,20 @@ internal static class LauncherRuntime
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int nIndex);
 
+    private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int processId);
+
+    [DllImport("psapi.dll")]
+    private static extern bool EmptyWorkingSet(IntPtr hProcess);
+
     [StructLayout(LayoutKind.Sequential)]
     private sealed class MemoryStatusEx
     {
@@ -728,6 +742,56 @@ internal static class LauncherRuntime
         catch
         {
             // Local telemetry is diagnostic only.
+        }
+    }
+
+    public static bool HasProcessWindow(System.Diagnostics.Process process)
+    {
+        try
+        {
+            if (process.HasExited)
+                return false;
+
+            process.Refresh();
+            if (process.MainWindowHandle != IntPtr.Zero)
+                return true;
+
+            var processId = process.Id;
+            var hasWindow = false;
+            EnumWindows((window, _) =>
+            {
+                GetWindowThreadProcessId(window, out var windowProcessId);
+                if (windowProcessId == processId && IsWindowVisible(window))
+                {
+                    hasWindow = true;
+                    return false;
+                }
+
+                return true;
+            }, IntPtr.Zero);
+
+            return hasWindow;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static void TrimCurrentProcessMemory()
+    {
+        try
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            using var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
+            EmptyWorkingSet(currentProcess.Handle);
+        }
+        catch
+        {
+            // Best-effort only. The launcher must never fail because memory trimming failed.
         }
     }
 

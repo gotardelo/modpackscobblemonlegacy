@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private LauncherPrimaryAction primaryAction = LauncherPrimaryAction.Hidden;
     private bool isBusy;
     private bool isClosing;
+    private ProcessPriorityClass? originalLauncherPriority;
 
     public MainWindow()
     {
@@ -382,7 +383,7 @@ public partial class MainWindow : Window
                 break;
 
             process.Refresh();
-            if (process.MainWindowHandle != IntPtr.Zero)
+            if (LauncherRuntime.HasProcessWindow(process))
                 return true;
 
             await Task.Delay(1000);
@@ -455,6 +456,7 @@ public partial class MainWindow : Window
 
         try
         {
+            EnterLauncherBackgroundMode("Launcher minimizado em segundo plano ate o Minecraft fechar.");
             WindowState = WindowState.Minimized;
 
             if (!process.HasExited)
@@ -464,6 +466,7 @@ public partial class MainWindow : Window
         {
             if (!isClosing)
             {
+                ExitLauncherBackgroundMode();
                 WindowState = previousState == WindowState.Minimized ? WindowState.Normal : previousState;
                 Activate();
                 SetStatus("Minecraft fechado. Launcher reaberto.");
@@ -477,6 +480,7 @@ public partial class MainWindow : Window
 
         try
         {
+            EnterLauncherBackgroundMode("Launcher escondido em segundo plano ate o Minecraft fechar.");
             ShowInTaskbar = false;
             Hide();
 
@@ -487,12 +491,48 @@ public partial class MainWindow : Window
         {
             if (!isClosing)
             {
+                ExitLauncherBackgroundMode();
                 ShowInTaskbar = showInTaskbar;
                 Show();
                 WindowState = WindowState.Normal;
                 Activate();
                 SetStatus("Minecraft fechado. Launcher reaberto.");
             }
+        }
+    }
+
+    private void EnterLauncherBackgroundMode(string message)
+    {
+        AppendLog(message);
+        SetStatus(message);
+
+        try
+        {
+            var currentProcess = Process.GetCurrentProcess();
+            originalLauncherPriority ??= currentProcess.PriorityClass;
+            currentProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Nao foi possivel reduzir prioridade do launcher: {ex.Message}");
+        }
+
+        LauncherRuntime.TrimCurrentProcessMemory();
+    }
+
+    private void ExitLauncherBackgroundMode()
+    {
+        try
+        {
+            if (originalLauncherPriority is not null)
+            {
+                Process.GetCurrentProcess().PriorityClass = originalLauncherPriority.Value;
+                originalLauncherPriority = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Nao foi possivel restaurar prioridade do launcher: {ex.Message}");
         }
     }
 
