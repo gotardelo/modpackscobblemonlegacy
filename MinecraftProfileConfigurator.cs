@@ -28,7 +28,7 @@ internal static class MinecraftProfileConfigurator
             return false;
 
         var lines = await File.ReadAllLinesAsync(optionsPath, Encoding.UTF8);
-        if (ShouldResetOptions(gameDir, lines))
+        if (ShouldResetOptions(gameDir, optionsPath))
         {
             BackupOptionsFile(gameDir, optionsPath, "options-broken.txt");
             File.Delete(optionsPath);
@@ -36,43 +36,26 @@ internal static class MinecraftProfileConfigurator
             return true;
         }
 
-        var cleaned = lines
-            .Where(line => !line.Contains("key.keyboard.unknown", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-
-        if (cleaned.Length == lines.Length)
-            return false;
-
-        BackupOptionsFile(gameDir, optionsPath, "options-invalid-keybinds.txt");
-        await File.WriteAllLinesAsync(optionsPath, cleaned, Encoding.UTF8);
-        log?.Invoke($"Opcoes locais reparadas: {lines.Length - cleaned.Length} keybind invalida removida.");
-        return true;
+        return false;
     }
 
-    private static bool ShouldResetOptions(string gameDir, string[] optionsLines)
+    private static bool ShouldResetOptions(string gameDir, string optionsPath)
     {
         var latestLogPath = Path.Combine(gameDir, "logs", "latest.log");
-        if (File.Exists(latestLogPath))
+        if (File.Exists(latestLogPath) && File.GetLastWriteTimeUtc(latestLogPath) >= File.GetLastWriteTimeUtc(optionsPath))
         {
             try
             {
-                var recentLog = File.ReadLines(latestLogPath, Encoding.UTF8).TakeLast(260);
-                if (recentLog.Any(line => line.Contains("Failed to load options", StringComparison.OrdinalIgnoreCase)))
-                    return true;
+                var recentLog = File.ReadLines(latestLogPath, Encoding.UTF8).TakeLast(500);
+                return recentLog.Any(line => line.Contains("Failed to load options", StringComparison.OrdinalIgnoreCase));
             }
             catch
             {
-                // Fall back to options-only checks.
+                return false;
             }
         }
 
-        var unknownKeybinds = optionsLines.Count(line => line.Contains("key.keyboard.unknown", StringComparison.OrdinalIgnoreCase));
-        if (unknownKeybinds >= 10)
-            return true;
-
-        return optionsLines.Any(line =>
-            line.StartsWith("key_", StringComparison.OrdinalIgnoreCase) &&
-            line.Contains("key.mouse.middle", StringComparison.OrdinalIgnoreCase));
+        return false;
     }
 
     private static void BackupOptionsFile(string gameDir, string optionsPath, string backupFileName)

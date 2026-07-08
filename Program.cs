@@ -19,7 +19,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.4.6";
+    public const string LauncherVersion = "1.4.7";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -231,7 +231,7 @@ internal static class LauncherRuntime
         {
             Session = session,
             MaximumRamMb = maximumRamMb,
-            MinimumRamMb = Math.Min(1024, maximumRamMb),
+            MinimumRamMb = Math.Min(768, maximumRamMb),
             ScreenWidth = settings.WindowWidth,
             ScreenHeight = settings.WindowHeight,
             FullScreen = settings.FullScreen,
@@ -446,9 +446,9 @@ internal static class LauncherRuntime
     {
         return totalMemoryMb switch
         {
-            >= 24_576 => 8_192,
-            >= 16_384 => 6_144,
-            >= 12_288 => 5_120,
+            >= 24_576 => 6_144,
+            >= 16_384 => 5_120,
+            >= 12_288 => 4_096,
             >= 8_192 => 3_072,
             _ => 2_048
         };
@@ -1442,8 +1442,22 @@ internal static class LauncherRuntime
             return fileName;
 
         var systemPath = Environment.GetFolderPath(Environment.SpecialFolder.System);
-        var systemCandidate = Path.Combine(systemPath, fileName);
-        return File.Exists(systemCandidate) ? systemCandidate : fileName;
+        var windowsPath = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        var candidates = new List<string>
+        {
+            Path.Combine(systemPath, fileName),
+            Path.Combine(windowsPath, "System32", fileName),
+            Path.Combine(windowsPath, "Sysnative", fileName)
+        };
+
+        if (fileName.Equals("powershell.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            candidates.Insert(0, Path.Combine(systemPath, "WindowsPowerShell", "v1.0", "powershell.exe"));
+            candidates.Insert(1, Path.Combine(windowsPath, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"));
+            candidates.Insert(2, Path.Combine(windowsPath, "Sysnative", "WindowsPowerShell", "v1.0", "powershell.exe"));
+        }
+
+        return candidates.FirstOrDefault(File.Exists) ?? fileName;
     }
 
     private static (string Host, int Port) ParseServerEndpoint()
