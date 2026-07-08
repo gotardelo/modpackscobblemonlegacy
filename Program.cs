@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -18,7 +19,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.4.4";
+    public const string LauncherVersion = "1.4.5";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -911,6 +912,10 @@ internal static class LauncherRuntime
         var report = new StringBuilder();
 
         AppendReportHeader(report, settings, gameDir, lastStatus);
+        var automaticDiagnostics = await BuildAutomaticDiagnosticsAsync(settings, gameDir);
+        var automaticDiagnosticsPath = Path.Combine(reportsDir, "automatic-diagnostics.txt");
+        await File.WriteAllTextAsync(automaticDiagnosticsPath, automaticDiagnostics, Encoding.UTF8);
+        AppendSection(report, "Diagnostico automatico", automaticDiagnostics);
         await AppendKnownLogFilesAsync(report, diagnosticsDir, gameDir);
         AppendSection(report, "Launcher UI visivel", string.IsNullOrWhiteSpace(visibleLog) ? "Sem log visivel." : visibleLog);
 
@@ -941,6 +946,7 @@ internal static class LauncherRuntime
             AddFileToArchiveIfExists(archive, Path.Combine(diagnosticsDir, "last-launch-command.txt"), "launcher/last-launch-command.txt");
             AddFileToArchiveIfExists(archive, TelemetryPath, "launcher/telemetry.jsonl");
             AddFileToArchiveIfExists(archive, ModpackManifestLoader.CachePath, "launcher/manifest-cache.json");
+            AddFileToArchiveIfExists(archive, Path.Combine(reportsDir, "automatic-diagnostics.txt"), "launcher/automatic-diagnostics.txt");
             AddFileToArchiveIfExists(archive, Path.Combine(gameDir, "logs", "latest.log"), "minecraft/latest.log");
             AddFileToArchiveIfExists(archive, Path.Combine(gameDir, "options.txt"), "minecraft/options.txt");
             AddFileToArchiveIfExists(archive, Path.Combine(gameDir, "servers.dat"), "minecraft/servers.dat");
@@ -993,6 +999,9 @@ internal static class LauncherRuntime
         AddDiagnostic(items, "Java", settings is null || settings.UseIntegratedJava ? "Runtime integrado" : settings.JavaPath, settings is not null && !settings.UseIntegratedJava && !File.Exists(settings.JavaPath) ? DiagnosticState.Error : DiagnosticState.Ok);
         AddDiagnostic(items, "Manifest", manifest is null ? "Nao carregado" : $"{manifest.Version} / {manifest.Files.Count} arquivos", manifest is null ? DiagnosticState.Warning : DiagnosticState.Ok);
         AddDiagnostic(items, "Telemetria local", TelemetryPath, File.Exists(TelemetryPath) ? DiagnosticState.Ok : DiagnosticState.Warning);
+        AddDiagnostic(items, "Rede servidor", await BuildQuickNetworkDiagnosticAsync(), DiagnosticState.Ok);
+        AddDiagnostic(items, "Opcoes locais", BuildOptionsDiagnostic(gameDir), File.Exists(Path.Combine(gameDir, "options.txt")) ? DiagnosticState.Ok : DiagnosticState.Warning);
+        AddDiagnostic(items, "Ultimo log multiplayer", await BuildLatestLogDiagnosticAsync(gameDir), File.Exists(Path.Combine(gameDir, "logs", "latest.log")) ? DiagnosticState.Ok : DiagnosticState.Warning);
 
         if (settings is not null && manifest is not null)
         {
@@ -1027,6 +1036,421 @@ internal static class LauncherRuntime
     private static void AddDiagnostic(List<DiagnosticItem> items, string name, string value, DiagnosticState state)
     {
         items.Add(new DiagnosticItem(name, value, state));
+    }
+
+    private static async Task<string> BuildAutomaticDiagnosticsAsync(LauncherSettings? settings, string gameDir)
+    {
+        var report = new StringBuilder();
+
+        AppendSection(report, "Resumo tecnico", BuildLocalSummary(settings, gameDir));
+        AppendSection(report, "Analise do latest.log", await BuildLatestLogAnalysisAsync(gameDir));
+        AppendSection(report, "Integridade local do pack", await BuildLocalPackAnalysisAsync(settings, gameDir));
+        AppendSection(report, "Teste de rede do servidor", await BuildNetworkAnalysisAsync());
+        AppendSection(report, "Processos Java/Minecraft", BuildJavaProcessAnalysis(gameDir));
+        AppendSection(report, "Diagnostico Windows - rede", await RunCommandAsync("ipconfig.exe", "/all", TimeSpan.FromSeconds(8), 18_000));
+        AppendSection(report, "Diagnostico Windows - rota", await RunCommandAsync("route.exe", "print", TimeSpan.FromSeconds(8), 18_000));
+        AppendSection(report, "Diagnostico Windows - proxy", await RunCommandAsync("netsh.exe", "winhttp show proxy", TimeSpan.FromSeconds(5), 8_000));
+        AppendSection(report, "Diagnostico Windows - tracert", await RunCommandAsync("tracert.exe", $"-d -h 20 -w 800 {ParseServerEndpoint().Host}", TimeSpan.FromSeconds(18), 16_000));
+        AppendSection(report, "Diagnostico Windows - GPU", await RunPowerShellAsync("Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion,AdapterRAM,VideoProcessor | Format-List", TimeSpan.FromSeconds(8), 12_000));
+        AppendSection(report, "Diagnostico Windows - antivirus", await RunPowerShellAsync("Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct | Select-Object displayName,pathToSignedProductExe,productState | Format-List", TimeSpan.FromSeconds(8), 12_000));
+
+        return report.ToString();
+    }
+
+    private static string BuildLocalSummary(LauncherSettings? settings, string gameDir)
+    {
+        var memory = TryGetPhysicalMemoryMb();
+        var screen = TryGetPrimaryScreenSize();
+        var builder = new StringBuilder()
+            .AppendLine($"GameDir existe: {Directory.Exists(gameDir)}")
+            .AppendLine($"GameDir: {gameDir}")
+            .AppendLine($"Settings existe: {File.Exists(LauncherSettings.SettingsPath)}")
+            .AppendLine($"Memoria: {(memory is null ? "desconhecida" : $"{memory.TotalMb} MB total / {memory.AvailableMb} MB livre")}")
+            .AppendLine($"Tela primaria: {(screen is null ? "desconhecida" : $"{screen.Value.Width}x{screen.Value.Height}")}")
+            .AppendLine($"RAM configurada: {settings?.MaximumRamMb.ToString() ?? "desconhecida"} MB")
+            .AppendLine($"Resolucao configurada: {(settings is null ? "desconhecida" : $"{settings.WindowWidth}x{settings.WindowHeight}")}")
+            .AppendLine($"Performance: {settings?.PerformanceProfile ?? PerformanceProfiles.Auto}")
+            .AppendLine($"Resourcepacks: {ResourcepackProfiles.ToDisplayName(settings?.ResourcepackProfile)}")
+            .AppendLine($"Compatibilidade: {settings?.CompatibilityMode.ToString() ?? "desconhecida"}")
+            .AppendLine($"Java integrado: {settings?.UseIntegratedJava.ToString() ?? "desconhecido"}")
+            .AppendLine($"Java customizado existe: {(!string.IsNullOrWhiteSpace(settings?.JavaPath) && File.Exists(Environment.ExpandEnvironmentVariables(settings.JavaPath))).ToString()}");
+
+        builder.AppendLine(BuildOptionsDiagnostic(gameDir));
+        return builder.ToString();
+    }
+
+    private static async Task<string> BuildQuickNetworkDiagnosticAsync()
+    {
+        var endpoint = ParseServerEndpoint();
+        var sample = await MeasureTcpConnectAsync(endpoint.Host, endpoint.Port, TimeSpan.FromSeconds(3));
+        return sample.Success
+            ? $"{endpoint.Host}:{endpoint.Port} TCP OK em {sample.ElapsedMs} ms"
+            : $"{endpoint.Host}:{endpoint.Port} falhou: {sample.Error}";
+    }
+
+    private static async Task<string> BuildNetworkAnalysisAsync()
+    {
+        var endpoint = ParseServerEndpoint();
+        var builder = new StringBuilder()
+            .AppendLine($"Host: {endpoint.Host}")
+            .AppendLine($"Porta: {endpoint.Port}");
+
+        try
+        {
+            var addresses = await Dns.GetHostAddressesAsync(endpoint.Host).WaitAsync(TimeSpan.FromSeconds(5));
+            builder.AppendLine($"DNS: {string.Join(", ", addresses.Select(address => address.ToString()))}");
+        }
+        catch (Exception ex)
+        {
+            builder.AppendLine($"DNS falhou: {ex.Message}");
+        }
+
+        var samples = new List<TcpConnectSample>();
+        for (var i = 1; i <= 10; i++)
+        {
+            var sample = await MeasureTcpConnectAsync(endpoint.Host, endpoint.Port, TimeSpan.FromSeconds(3));
+            samples.Add(sample);
+            builder.AppendLine(sample.Success
+                ? $"TCP {i}: OK {sample.ElapsedMs} ms"
+                : $"TCP {i}: FALHOU {sample.Error}");
+            await Task.Delay(250);
+        }
+
+        var successes = samples.Where(sample => sample.Success).ToArray();
+        var failures = samples.Count - successes.Length;
+        if (successes.Length > 0)
+        {
+            builder.AppendLine($"Resumo TCP: {successes.Length}/10 OK, {failures} falhas, min {successes.Min(sample => sample.ElapsedMs)} ms, max {successes.Max(sample => sample.ElapsedMs)} ms, media {(int)successes.Average(sample => sample.ElapsedMs)} ms.");
+        }
+        else
+        {
+            builder.AppendLine("Resumo TCP: nenhuma conexao conseguiu abrir.");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("Interpretacao:");
+        builder.AppendLine("- TCP OK com Minecraft dando timeout geralmente indica problema durante login/sincronizacao modded, firewall/antivirus filtrando javaw.exe, travamento local ou timeout baixo no servidor/proxy.");
+        builder.AppendLine("- Falhas TCP ou latencia muito instavel indicam rota, modem, provedor, firewall ou bloqueio de porta.");
+        return builder.ToString();
+    }
+
+    private static async Task<TcpConnectSample> MeasureTcpConnectAsync(string host, int port, TimeSpan timeout)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(host, port).WaitAsync(timeout);
+            stopwatch.Stop();
+            return new TcpConnectSample(true, stopwatch.ElapsedMilliseconds, "");
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            return new TcpConnectSample(false, stopwatch.ElapsedMilliseconds, ex.GetBaseException().Message);
+        }
+    }
+
+    private static async Task<string> BuildLatestLogDiagnosticAsync(string gameDir)
+    {
+        var latestLog = Path.Combine(gameDir, "logs", "latest.log");
+        if (!File.Exists(latestLog))
+            return "latest.log nao encontrado.";
+
+        try
+        {
+            var lines = await File.ReadAllLinesAsync(latestLog, Encoding.UTF8);
+            var connect = lines.LastOrDefault(line => line.Contains("Connecting to ", StringComparison.OrdinalIgnoreCase));
+            var disconnect = lines.LastOrDefault(line => line.Contains("Client disconnected", StringComparison.OrdinalIgnoreCase) || line.Contains("Timed out", StringComparison.OrdinalIgnoreCase));
+            var errors = lines.Count(line => line.Contains("/ERROR]", StringComparison.OrdinalIgnoreCase) || line.Contains("Exception", StringComparison.OrdinalIgnoreCase));
+            return $"Linhas: {lines.Length}; erros/exceptions: {errors}; ultima conexao: {connect ?? "nao encontrada"}; ultimo disconnect: {disconnect ?? "nao encontrado"}";
+        }
+        catch (Exception ex)
+        {
+            return $"Nao foi possivel ler latest.log: {ex.Message}";
+        }
+    }
+
+    private static async Task<string> BuildLatestLogAnalysisAsync(string gameDir)
+    {
+        var latestLog = Path.Combine(gameDir, "logs", "latest.log");
+        if (!File.Exists(latestLog))
+            return "latest.log nao encontrado.";
+
+        try
+        {
+            var lines = await File.ReadAllLinesAsync(latestLog, Encoding.UTF8);
+            var builder = new StringBuilder()
+                .AppendLine($"Arquivo: {latestLog}")
+                .AppendLine($"Linhas: {lines.Length}")
+                .AppendLine($"ERROR: {lines.Count(line => line.Contains("/ERROR]", StringComparison.OrdinalIgnoreCase))}")
+                .AppendLine($"WARN: {lines.Count(line => line.Contains("/WARN]", StringComparison.OrdinalIgnoreCase))}")
+                .AppendLine($"Exception: {lines.Count(line => line.Contains("Exception", StringComparison.OrdinalIgnoreCase))}");
+
+            AddLogSignal(builder, lines, "Minecraft/Fabric", "Loading Minecraft");
+            AddLogSignal(builder, lines, "Mods carregados", "Loading ", " mods:");
+            AddLogSignal(builder, lines, "OpenGL renderer", "OpenGL Renderer:");
+            AddLogSignal(builder, lines, "OpenGL version", "OpenGL Version:");
+            AddLogSignal(builder, lines, "Opcoes quebradas", "Failed to load options");
+            AddLogSignal(builder, lines, "Conexao servidor", "Connecting to ");
+            AddLogSignal(builder, lines, "EMI sync", "[EMI]");
+            AddLogSignal(builder, lines, "Disconnect", "Client disconnected");
+            AddLogSignal(builder, lines, "Timeout", "Timed out");
+            AddLogSignal(builder, lines, "Memoria", "OutOfMemoryError");
+            AddLogSignal(builder, lines, "Mods incompativeis", "incompatible");
+
+            builder.AppendLine();
+            builder.AppendLine("Ultimos sinais relevantes:");
+            foreach (var line in lines.Where(IsRelevantLogLine).TakeLast(80))
+                builder.AppendLine(line);
+
+            return builder.ToString();
+        }
+        catch (Exception ex)
+        {
+            return $"Nao foi possivel analisar latest.log: {ex.Message}";
+        }
+    }
+
+    private static void AddLogSignal(StringBuilder builder, string[] lines, string label, params string[] patterns)
+    {
+        var line = lines.LastOrDefault(candidate => patterns.All(pattern => candidate.Contains(pattern, StringComparison.OrdinalIgnoreCase)));
+        builder.AppendLine($"{label}: {line ?? "nao encontrado"}");
+    }
+
+    private static bool IsRelevantLogLine(string line)
+    {
+        var patterns = new[]
+        {
+            "Loading Minecraft",
+            "Loading ",
+            " mods:",
+            "OpenGL",
+            "Connecting to ",
+            "Client disconnected",
+            "Timed out",
+            "Failed to load options",
+            "/ERROR]",
+            "Exception",
+            "OutOfMemoryError",
+            "incompatible",
+            "[EMI]"
+        };
+
+        return patterns.Any(pattern => line.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string BuildOptionsDiagnostic(string gameDir)
+    {
+        var optionsPath = Path.Combine(gameDir, "options.txt");
+        if (!File.Exists(optionsPath))
+            return "options.txt nao encontrado.";
+
+        try
+        {
+            var lines = File.ReadAllLines(optionsPath, Encoding.UTF8);
+            var unknownKeybinds = lines.Count(line => line.Contains("key.keyboard.unknown", StringComparison.OrdinalIgnoreCase));
+            var lastServer = lines.LastOrDefault(line => line.StartsWith("lastServer:", StringComparison.OrdinalIgnoreCase)) ?? "lastServer nao encontrado";
+            return $"options.txt: {lines.Length} linhas; key.keyboard.unknown: {unknownKeybinds}; {lastServer}";
+        }
+        catch (Exception ex)
+        {
+            return $"Nao foi possivel ler options.txt: {ex.Message}";
+        }
+    }
+
+    private static async Task<string> BuildLocalPackAnalysisAsync(LauncherSettings? settings, string gameDir)
+    {
+        var builder = new StringBuilder();
+        var modsPath = Path.Combine(gameDir, "mods");
+        var resourcepacksPath = Path.Combine(gameDir, "resourcepacks");
+        var mods = Directory.Exists(modsPath) ? Directory.GetFiles(modsPath, "*.jar", SearchOption.TopDirectoryOnly) : [];
+        var resourcepacks = Directory.Exists(resourcepacksPath) ? Directory.GetFiles(resourcepacksPath, "*.zip", SearchOption.TopDirectoryOnly) : [];
+
+        builder.AppendLine($"Mods locais: {mods.Length}");
+        builder.AppendLine($"Resourcepacks locais: {resourcepacks.Length}");
+        AppendDuplicateFiles(builder, "Mods duplicados por nome", mods);
+        AppendDuplicateFiles(builder, "Resourcepacks duplicados por nome", resourcepacks);
+
+        var manifest = await ModpackManifestLoader.TryLoadCachedAsync(JsonOptions);
+        if (manifest is null)
+        {
+            builder.AppendLine("Manifest em cache nao encontrado; nao foi possivel comparar pack esperado.");
+            return builder.ToString();
+        }
+
+        var resourcepackProfile = settings?.ResourcepackProfile ?? ResourcepackProfiles.Balanced;
+        var expected = manifest.Files
+            .Where(file => ResourcepackProfiles.Includes(file.Path.Replace('\\', '/'), resourcepackProfile))
+            .Select(file => file.Path.Replace('\\', '/'))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var actual = mods.Select(path => $"mods/{Path.GetFileName(path)}")
+            .Concat(resourcepacks.Select(path => $"resourcepacks/{Path.GetFileName(path)}"))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missing = expected.Where(path => path.StartsWith("mods/", StringComparison.OrdinalIgnoreCase) || path.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !actual.Contains(path))
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var extra = actual.Where(path => !expected.Contains(path))
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        builder.AppendLine($"Manifest cache: {manifest.Version}, Minecraft {manifest.MinecraftVersion}, Fabric {manifest.FabricLoaderVersion}, {manifest.Files.Count} arquivos.");
+        builder.AppendLine($"Esperado neste perfil ({ResourcepackProfiles.ToDisplayName(resourcepackProfile)}): {expected.Count(path => path.StartsWith("mods/", StringComparison.OrdinalIgnoreCase))} mods / {expected.Count(path => path.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase))} resourcepacks.");
+        builder.AppendLine($"Ausentes: {missing.Length}");
+        foreach (var item in missing.Take(40))
+            builder.AppendLine($"  ausente: {item}");
+        builder.AppendLine($"Extras: {extra.Length}");
+        foreach (var item in extra.Take(40))
+            builder.AppendLine($"  extra: {item}");
+
+        var mismatches = await FindHashMismatchesAsync(gameDir, manifest, resourcepackProfile);
+        builder.AppendLine($"Hash divergente/arquivo quebrado: {mismatches.Length}");
+        foreach (var item in mismatches.Take(40))
+            builder.AppendLine($"  hash: {item}");
+
+        return builder.ToString();
+    }
+
+    private static async Task<string[]> FindHashMismatchesAsync(string gameDir, ModpackManifest manifest, string resourcepackProfile)
+    {
+        var mismatches = new List<string>();
+        foreach (var file in manifest.Files.Where(file => ResourcepackProfiles.Includes(file.Path.Replace('\\', '/'), resourcepackProfile)))
+        {
+            if (string.IsNullOrWhiteSpace(file.Sha256))
+                continue;
+
+            var relativePath = file.Path.Replace('\\', '/');
+            if (!relativePath.StartsWith("mods/", StringComparison.OrdinalIgnoreCase) &&
+                !relativePath.StartsWith("resourcepacks/", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var target = Path.Combine(gameDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(target))
+                continue;
+
+            try
+            {
+                await using var stream = File.OpenRead(target);
+                using var sha = SHA256.Create();
+                var hash = Convert.ToHexString(await sha.ComputeHashAsync(stream));
+                if (!string.Equals(hash, file.Sha256, StringComparison.OrdinalIgnoreCase))
+                    mismatches.Add(relativePath);
+            }
+            catch (Exception ex)
+            {
+                mismatches.Add($"{relativePath} ({ex.Message})");
+            }
+        }
+
+        return mismatches.ToArray();
+    }
+
+    private static void AppendDuplicateFiles(StringBuilder builder, string title, string[] files)
+    {
+        var duplicates = files
+            .GroupBy(path => Regex.Replace(Path.GetFileNameWithoutExtension(path), @"\s+\(\d+\)$", ""), StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .ToArray();
+
+        builder.AppendLine($"{title}: {duplicates.Length}");
+        foreach (var group in duplicates.Take(20))
+            builder.AppendLine($"  {group.Key}: {string.Join(" | ", group.Select(Path.GetFileName))}");
+    }
+
+    private static string BuildJavaProcessAnalysis(string gameDir)
+    {
+        var runtimeDir = Path.Combine(Path.GetFullPath(gameDir), "runtime");
+        var builder = new StringBuilder();
+        foreach (var processName in new[] { "java", "javaw" })
+        {
+            foreach (var process in Process.GetProcessesByName(processName))
+            {
+                using (process)
+                {
+                    try
+                    {
+                        var executable = process.MainModule?.FileName ?? "desconhecido";
+                        builder.AppendLine($"PID {process.Id} {process.ProcessName}: {executable}");
+                        builder.AppendLine($"  Runtime do launcher: {IsInsideDirectory(executable, runtimeDir)}");
+                        builder.AppendLine($"  Memoria: {process.WorkingSet64 / 1024 / 1024} MB; iniciou: {process.StartTime:yyyy-MM-dd HH:mm:ss}; janela: {process.MainWindowHandle != IntPtr.Zero}");
+                    }
+                    catch (Exception ex)
+                    {
+                        builder.AppendLine($"PID {process.Id} {process.ProcessName}: nao foi possivel ler detalhes ({ex.Message})");
+                    }
+                }
+            }
+        }
+
+        return builder.Length == 0 ? "Nenhum processo java/javaw encontrado no momento do relatorio." : builder.ToString();
+    }
+
+    private static async Task<string> RunPowerShellAsync(string command, TimeSpan timeout, int maxChars)
+    {
+        return await RunCommandAsync("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -Command \"{command.Replace("\"", "\\\"")}\"", timeout, maxChars);
+    }
+
+    private static async Task<string> RunCommandAsync(string fileName, string arguments, TimeSpan timeout, int maxChars)
+    {
+        try
+        {
+            var resolvedFileName = ResolveCommandPath(fileName);
+            var startInfo = new ProcessStartInfo(resolvedFileName, arguments)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using var process = Process.Start(startInfo);
+            if (process is null)
+                return $"Nao foi possivel iniciar comando: {fileName}";
+
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            var waitTask = process.WaitForExitAsync();
+            var timeoutTask = Task.Delay(timeout);
+            await Task.WhenAny(waitTask, timeoutTask);
+            if (!process.HasExited)
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                return $"Comando excedeu {timeout.TotalSeconds:0}s: {fileName} {arguments}";
+            }
+
+            var output = await outputTask;
+            var error = await errorTask;
+            var text = string.IsNullOrWhiteSpace(error) ? output : $"{output}{Environment.NewLine}[stderr]{Environment.NewLine}{error}";
+            if (text.Length > maxChars)
+                text = text[^maxChars..];
+
+            return string.IsNullOrWhiteSpace(text) ? "Comando executado sem saida." : text;
+        }
+        catch (Exception ex)
+        {
+            return $"Falha ao executar {fileName}: {ex.Message}";
+        }
+    }
+
+    private static string ResolveCommandPath(string fileName)
+    {
+        if (Path.IsPathRooted(fileName) || fileName.Contains(Path.DirectorySeparatorChar))
+            return fileName;
+
+        var systemPath = Environment.GetFolderPath(Environment.SpecialFolder.System);
+        var systemCandidate = Path.Combine(systemPath, fileName);
+        return File.Exists(systemCandidate) ? systemCandidate : fileName;
+    }
+
+    private static (string Host, int Port) ParseServerEndpoint()
+    {
+        var parts = ServerIp.Split(':', 2);
+        return parts.Length == 2 && int.TryParse(parts[1], out var port)
+            ? (parts[0], port)
+            : (ServerIp, 25565);
     }
 
     private static void AddFileToArchiveIfExists(ZipArchive archive, string? sourcePath, string entryName)
@@ -1149,6 +1573,8 @@ internal static class LauncherRuntime
     }
 
     private sealed record ReportFile(string Title, string? Path, int MaxLines);
+
+    private sealed record TcpConnectSample(bool Success, long ElapsedMs, string Error);
 }
 
 internal sealed record CrashReportResult(string Path, string Text);
