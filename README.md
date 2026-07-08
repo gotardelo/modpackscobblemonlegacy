@@ -73,6 +73,12 @@ Depois gere o manifest com hashes:
 .\tools\New-ModpackManifest.ps1 -Version "1.0.0" -ReleaseBaseUrl "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0"
 ```
 
+Antes de publicar qualquer troca de mods/resourcepacks, rode a validacao contra duplicados:
+
+```powershell
+.\tools\Test-PackIntegrity.ps1
+```
+
 Suba os arquivos dentro de `pack/mods`, `pack/resourcepacks`, `pack/config` e `pack/shaderpacks` como assets da GitHub Release. O manifest guarda o destino local completo, mas a URL da release usa o nome do arquivo.
 
 ## Publicar o launcher
