@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.3.4";
+    public const string LauncherVersion = "1.3.5";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -2069,6 +2069,8 @@ internal static class ManagedFileSynchronizer
             }
         }
 
+        removed += RemoveUnexpectedManagedFolderFiles(gameDir, "mods", expectedPaths, log);
+
         state.ManifestVersion = manifest.Version;
         state.ManagedFiles = expectedPaths.Order(StringComparer.OrdinalIgnoreCase).ToList();
         await File.WriteAllTextAsync(statePath, JsonSerializer.Serialize(state, jsonOptions), Encoding.UTF8);
@@ -2082,6 +2084,42 @@ internal static class ManagedFileSynchronizer
             .Select(file => new ManagedFileEntry(NormalizeRelativePath(file.Path), file))
             .Where(entry => ResourcepackProfiles.Includes(entry.RelativePath, resourcepackProfile))
             .ToArray();
+    }
+
+    private static int RemoveUnexpectedManagedFolderFiles(
+        string gameDir,
+        string folderName,
+        HashSet<string> expectedPaths,
+        Action<string>? log)
+    {
+        var folderPath = ResolveGamePath(gameDir, folderName);
+        if (!Directory.Exists(folderPath))
+            return 0;
+
+        var removed = 0;
+        foreach (var file in Directory.EnumerateFiles(folderPath, "*", SearchOption.TopDirectoryOnly))
+        {
+            var fileName = Path.GetFileName(file);
+            if (fileName is ".gitkeep" or ".DS_Store" or "Thumbs.db")
+                continue;
+
+            var relativePath = NormalizeRelativePath($"{folderName}/{fileName}");
+            if (expectedPaths.Contains(relativePath))
+                continue;
+
+            try
+            {
+                File.Delete(file);
+                log?.Invoke($"Removido arquivo fora do manifest: {relativePath}");
+                removed++;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Nao foi possivel remover arquivo antigo: {relativePath}. Feche o Minecraft e tente REPARAR. Detalhe: {ex.Message}", ex);
+            }
+        }
+
+        return removed;
     }
 
     private static async Task<ManagedFileSyncResult> EnsureFileAsync(

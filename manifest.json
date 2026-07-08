@@ -1,6 +1,6 @@
 ﻿{
     "name":  "Cobblemon Legacy",
-    "version":  "1.0.6",
+    "version":  "1.0.7",
     "minecraftVersion":  "1.21.1",
     "fabricLoaderVersion":  "0.19.3",
     "files":  [
@@ -96,6 +96,20 @@
                       "required":  true
                   },
                   {
+                      "path":  "mods/Chunky-Fabric-1.4.23 (2).jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/Chunky-Fabric-1.4.23.2.jar",
+                      "sha256":  "3412b170247dde7351e0945d857e713bedf6fae05ab300aa74d06ffbde0ca07e",
+                      "size":  342979,
+                      "required":  true
+                  },
+                  {
+                      "path":  "mods/clear-drops-3.0 (6).jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/clear-drops-3.0.6.jar",
+                      "sha256":  "1b1089956d8bae5d607f2e103ea91306d72af12f1c095d077e03b0ecfa9888be",
+                      "size":  87046,
+                      "required":  true
+                  },
+                  {
                       "path":  "mods/cloth-config-15.0.140-fabric (6).jar",
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/cloth-config-15.0.140-fabric.6.jar",
                       "sha256":  "33894e95da3af59014b39d126586d5241e07ea39f8618763e30dab637405f95f",
@@ -142,6 +156,13 @@
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/cobblemonalphas-1.4.1.3.jar",
                       "sha256":  "c62be4d3ee441084a51b3cd6d6a40f2fd674f16c2412afbd328b0c50feac30d5",
                       "size":  510732,
+                      "required":  true
+                  },
+                  {
+                      "path":  "mods/CobblemonExtras-fabric-1.5.0 (4).jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/CobblemonExtras-fabric-1.5.0.4.jar",
+                      "sha256":  "13e36519aa8e55478ac439bbd8836ee36e06c3a1b425d7fd162ba8109bbd825e",
+                      "size":  5036503,
                       "required":  true
                   },
                   {
@@ -215,6 +236,13 @@
                       "required":  true
                   },
                   {
+                      "path":  "mods/collective-1.21.1-8.39.jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/collective-1.21.1-8.39.jar",
+                      "sha256":  "ae59b63790c3097fb01e7801c21f3e7feed13b151c2ad993895196c74381a8fe",
+                      "size":  1061931,
+                      "required":  true
+                  },
+                  {
                       "path":  "mods/complete-cobblemon-collection-myths-and-legends-compat-2.1.0.jar",
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/complete-cobblemon-collection-myths-and-legends-compat-2.1.0.jar",
                       "sha256":  "dde0516b938fe469005839dd6e3fe5289e3c17298f6d0448db663cb037e5c1b6",
@@ -243,10 +271,24 @@
                       "required":  true
                   },
                   {
+                      "path":  "mods/CraftTweaker-fabric-1.21.1-21.0.38 (3).jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/CraftTweaker-fabric-1.21.1-21.0.38.3.jar",
+                      "sha256":  "0232ca9d69713f366eecec58838772848d969028b6bfe283cde86ac712ede361",
+                      "size":  4178419,
+                      "required":  true
+                  },
+                  {
                       "path":  "mods/cupboard-fabric-1.21.1-3.8.jar",
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/cupboard-fabric-1.21.1-3.8.jar",
                       "sha256":  "8ff596a45704b3273df1035ff5ac9c4bf4156fc09bded697f42b827a0e843a9d",
                       "size":  25921,
+                      "required":  true
+                  },
+                  {
+                      "path":  "mods/deathbackup-1.21.1-3.6.jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/deathbackup-1.21.1-3.6.jar",
+                      "sha256":  "8a7282a234722a62ea5154bee71142159ec7b023832d2dfc4b84344cdf8ab70a",
+                      "size":  52372,
                       "required":  true
                   },
                   {
@@ -313,6 +355,13 @@
                       "required":  true
                   },
                   {
+                      "path":  "mods/essential_commands-0.35.2-mc1.21 (7).jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/essential_commands-0.35.2-mc1.21.7.jar",
+                      "sha256":  "3b29328335d3e94bff279979d7a2afbb48af01e5738363ec014c02393f29ec18",
+                      "size":  1442941,
+                      "required":  true
+                  },
+                  {
                       "path":  "mods/everlastingutils-1.1.6 (1).jar",
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/everlastingutils-1.1.6.1.jar",
                       "sha256":  "ba2a72eac0020525e13ebccb538e0bc6853708217510a4af243cea15651244d6",
@@ -362,6 +411,13 @@
                       "required":  true
                   },
                   {
+                      "path":  "mods/flan-1.21.1-1.12.7-fabric.jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/flan-1.21.1-1.12.7-fabric.jar",
+                      "sha256":  "de2119afce10019bac4fec75b441c608b84bcc5c79b22239363dc556c7217dc7",
+                      "size":  944034,
+                      "required":  true
+                  },
+                  {
                       "path":  "mods/ForgeConfigAPIPort-v21.1.6-1.21.1-Fabric (12).jar",
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/ForgeConfigAPIPort-v21.1.6-1.21.1-Fabric.12.jar",
                       "sha256":  "2e3a8f0e3bda85a7d722720e7ce879cbd9d028d9395c6fc224d329b3c982d9b1",
@@ -394,6 +450,13 @@
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/indium-1.0.35%2Bmc1.21.4.jar",
                       "sha256":  "13bd78303315ca8f08ea19dfacce8566e152c56615e93a07c490965f390d4ed8",
                       "size":  105000,
+                      "required":  true
+                  },
+                  {
+                      "path":  "mods/iris-fabric-1.8.8+mc1.21.1 (3).jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/iris-fabric-1.8.8%2Bmc1.21.1.3.jar",
+                      "sha256":  "b5ad39a6cb113ca0a1765f06689f9f4b29ccd0c81247de90b06c42f5da1092f5",
+                      "size":  2690177,
                       "required":  true
                   },
                   {
@@ -516,10 +579,31 @@
                       "required":  true
                   },
                   {
+                      "path":  "mods/spark-1.10.109-fabric (3).jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/spark-1.10.109-fabric.3.jar",
+                      "sha256":  "fafc121ac53dab1c32e74b7a1cae47d54435ba4cbeeda1180dc96675a7757047",
+                      "size":  3609981,
+                      "required":  true
+                  },
+                  {
                       "path":  "mods/starlightfusion-fabric-1.8.0 (1).jar",
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/starlightfusion-fabric-1.8.0.1.jar",
                       "sha256":  "c95b3e17e45a8114a5f70dd2238c8a0791d3823f09078b0d09a7b361fafc9763",
                       "size":  1300094,
+                      "required":  true
+                  },
+                  {
+                      "path":  "mods/TAB v5.5.0 1.20.5 - 1.21.1 (1).jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/TAB.v5.5.0.1.20.5.-.1.21.1.1.jar",
+                      "sha256":  "abadbe8cf11b0736fdf3cdbac22a0518590acd118813983e99a6d16e9b94d985",
+                      "size":  4025747,
+                      "required":  true
+                  },
+                  {
+                      "path":  "mods/Terralith_1.21.x_v2.6.2.jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/Terralith_1.21.x_v2.6.2.jar",
+                      "sha256":  "9cd4d402fde0f523e5b430ac8fd479ce05aea7a50fe0c8c26901f5f769272214",
+                      "size":  2813817,
                       "required":  true
                   },
                   {
@@ -551,6 +635,13 @@
                       "required":  true
                   },
                   {
+                      "path":  "mods/vmp-fabric-mc1.21.1-0.2.0+beta.7.172-all.jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/vmp-fabric-mc1.21.1-0.2.0%2Bbeta.7.172-all.jar",
+                      "sha256":  "97a35a4388b1e7cd5325983b1e3f5f72fe7460367ef5755ae9fc9785c2930803",
+                      "size":  433667,
+                      "required":  true
+                  },
+                  {
                       "path":  "mods/watut-fabric-1.21.0-1.2.7 (3).jar",
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/watut-fabric-1.21.0-1.2.7.3.jar",
                       "sha256":  "4abc97c0a011794929278e460cd438ff356d3cc560e7500d7faea6edf7bd2b92",
@@ -562,6 +653,13 @@
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/waystones-fabric-1.21.1-21.1.35.jar",
                       "sha256":  "eb12143c6549d10bb39da867858708142c9a6867db2aeeda6c5a4a3eb4c2718e",
                       "size":  1186038,
+                      "required":  true
+                  },
+                  {
+                      "path":  "mods/worldedit-mod-7.3.8 (7).jar",
+                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/worldedit-mod-7.3.8.7.jar",
+                      "sha256":  "5e7752c97876d87411e3760bcc573cc431f43c453722e6959fa7fe54db1b01ca",
+                      "size":  6222854,
                       "required":  true
                   },
                   {
