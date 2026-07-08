@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.4.0";
+    public const string LauncherVersion = "1.4.1";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -1210,6 +1210,7 @@ internal static class ResourcepackProfiles
 
     private static readonly string[] BalancedBlockedKeywords =
     [
+        "tcg",
         "animated",
         "fresh",
         "motion",
@@ -1276,7 +1277,7 @@ internal static class ResourcepackProfiles
 public sealed class LauncherSettings
 {
     private const int LegacyRecommendedRamMb = 8192;
-    private const int CurrentRuntimeDefaultsVersion = 5;
+    private const int CurrentRuntimeDefaultsVersion = 6;
 
     public static string SettingsPath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -1295,7 +1296,7 @@ public sealed class LauncherSettings
     public string LauncherVisibility { get; set; } = LauncherVisibilityModes.HideUntilGameExits;
     public bool CompatibilityMode { get; set; }
     public string PerformanceProfile { get; set; } = PerformanceProfiles.Auto;
-    public string ResourcepackProfile { get; set; } = ResourcepackProfiles.Full;
+    public string ResourcepackProfile { get; set; } = ResourcepackProfiles.Balanced;
     public bool UseIntegratedJava { get; set; } = true;
     public string JavaPath { get; set; } = "";
     public string ExtraJvmArguments { get; set; } = "";
@@ -1476,7 +1477,7 @@ public sealed class LauncherSettings
                 changed = true;
             }
         }
-        else if (tier == PerformanceTier.Balanced)
+        else
         {
             if (string.Equals(ResourcepackProfile, ResourcepackProfiles.Full, StringComparison.OrdinalIgnoreCase))
             {
@@ -2169,6 +2170,7 @@ internal static class ManagedFileSynchronizer
     {
         return manifest.Files
             .Select(file => new ManagedFileEntry(NormalizeRelativePath(file.Path), file))
+            .Where(entry => ResourcepackProfiles.Includes(entry.RelativePath, resourcepackProfile))
             .ToArray();
     }
 
