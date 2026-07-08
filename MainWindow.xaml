@@ -640,6 +640,22 @@
                                        FontSize="11"
                                        FontWeight="SemiBold"
                                        Margin="0,4,0,0" />
+                            <Border x:Name="PreflightPanel"
+                                    Margin="0,8,0,0"
+                                    Padding="10,8"
+                                    CornerRadius="6"
+                                    BorderBrush="#3F80D6EA"
+                                    BorderThickness="1"
+                                    Background="#8A071018"
+                                    Visibility="Collapsed">
+                                <TextBlock x:Name="PreflightText"
+                                           Text="Pre-voo aguardando..."
+                                           Foreground="#DDF8FF"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           LineHeight="15"
+                                           TextWrapping="Wrap" />
+                            </Border>
                         </StackPanel>
                     </Border>
                 </Grid>

@@ -316,14 +316,17 @@ public partial class MainWindow : Window
             if (isClosing)
                 return;
 
-            var versionId = await UpdatePackCoreAsync(launchAfterUpdate: true);
+            var activeManifest = await EnsureManifestForPlayAsync();
+            var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
+            var readiness = await RunPreflightAsync(activeManifest, gameDir);
+            var versionId = await UpdatePackCoreAsync(launchAfterUpdate: true, activeManifest, readiness);
             if (isClosing)
                 return;
 
-            var gameDir = LauncherRuntime.ExpandGameDirectory(settings);
             var launcher = LauncherRuntime.CreateMinecraftLauncher(gameDir, SetStatus, SetByteProgress);
 
             SetPrimaryAction(LauncherPrimaryAction.Launching);
+            AppendPreflightLine("Minecraft: iniciando...");
             SetStatus("Abrindo Minecraft...");
             process = await LauncherRuntime.StartGameAsync(launcher, versionId, settings, session, AppendLog);
             runningMinecraftProcess = process;
@@ -401,6 +404,101 @@ public partial class MainWindow : Window
             $"O Minecraft fechou antes de abrir corretamente (codigo {exitCode}).{Environment.NewLine}" +
             $"{logHint}{Environment.NewLine}" +
             "O launcher ficou aberto para voce tentar novamente ou enviar esse erro para o suporte.");
+    }
+
+    private async Task<PackReadiness> RunPreflightAsync(ModpackManifest activeManifest, string gameDir)
+    {
+        if (settings is null)
+            throw new InvalidOperationException("Configuracao nao carregada.");
+
+        SetStatus("Pre-voo: conferindo perfil, memoria, pack e servidor...");
+        ShowPreflightPanel();
+        UpdatePreflight("Perfil: verificando...\nMemoria: aguardando\nPack: aguardando\nServidor: aguardando");
+
+        var profileLine = settings.AuthMode switch
+        {
+            AuthModes.Microsoft => string.IsNullOrWhiteSpace(settings.MicrosoftUsername)
+                ? "Perfil: Microsoft precisa de login"
+                : $"Perfil: Microsoft ({settings.MicrosoftUsername})",
+            AuthModes.Offline => $"Perfil: Offline ({settings.OfflineUsername})",
+            _ => "Perfil: escolha uma conta"
+        };
+        UpdatePreflight($"{profileLine}\nMemoria: verificando...\nPack: aguardando\nServidor: aguardando");
+
+        var memoryLine = BuildMemoryPreflightLine();
+        UpdatePreflight($"{profileLine}\n{memoryLine}\nPack: verificando...\nServidor: aguardando");
+
+        var readiness = await LauncherRuntime.CheckPackReadinessAsync(gameDir, activeManifest, LauncherRuntime.JsonOptions, settings.ResourcepackProfile);
+        var packLine = readiness.IsReady
+            ? $"Pack: OK ({activeManifest.Files.Count} arquivos)"
+            : $"Pack: precisa atualizar ({readiness.Message})";
+        UpdatePreflight($"{profileLine}\n{memoryLine}\n{packLine}\nServidor: consultando...");
+
+        var serverLine = await BuildServerPreflightLineAsync();
+        UpdatePreflight($"{profileLine}\n{memoryLine}\n{packLine}\n{serverLine}");
+        return readiness;
+    }
+
+    private string BuildMemoryPreflightLine()
+    {
+        var memory = LauncherRuntime.GetSystemMemorySnapshot();
+        if (memory is null || settings is null)
+            return "Memoria: OK";
+
+        var safeFree = Math.Max(0, memory.Value.AvailableMb);
+        if (safeFree < 2_500)
+            return $"Memoria: atencao ({safeFree} MB livres, launcher ajusta automaticamente)";
+
+        return $"Memoria: OK ({safeFree} MB livres)";
+    }
+
+    private async Task<string> BuildServerPreflightLineAsync()
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            var status = await MinecraftServerStatusClient.QueryAsync(LauncherRuntime.ServerIp, timeout.Token);
+            return status.IsAvailable
+                ? $"Servidor: OK ({status.Online}/{status.Max}, {status.LatencyMs}ms)"
+                : "Servidor: indisponivel no momento";
+        }
+        catch
+        {
+            return "Servidor: sem resposta rapida, tentando abrir mesmo assim";
+        }
+    }
+
+    private void ShowPreflightPanel()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(ShowPreflightPanel);
+            return;
+        }
+
+        PreflightPanel.Visibility = Visibility.Visible;
+    }
+
+    private void UpdatePreflight(string message)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => UpdatePreflight(message));
+            return;
+        }
+
+        PreflightText.Text = message;
+    }
+
+    private void AppendPreflightLine(string message)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => AppendPreflightLine(message));
+            return;
+        }
+
+        PreflightText.Text = $"{PreflightText.Text.TrimEnd()}{Environment.NewLine}{message}";
     }
 
     private static string TryGetExitCode(Process process)
@@ -562,13 +660,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<string> UpdatePackCoreAsync(bool launchAfterUpdate)
+    private async Task<string> UpdatePackCoreAsync(
+        bool launchAfterUpdate,
+        ModpackManifest? knownManifest = null,
+        PackReadiness? knownReadiness = null)
     {
         if (settings is null)
             throw new InvalidOperationException("Configuracao nao carregada.");
 
         var stopwatch = Stopwatch.StartNew();
-        var activeManifest = await EnsureManifestForPlayAsync();
+        var activeManifest = knownManifest ?? await EnsureManifestForPlayAsync();
         LauncherRuntime.WriteTelemetry("pack_update_start", new Dictionary<string, object?>
         {
             ["manifestVersion"] = activeManifest.Version,
@@ -580,7 +681,7 @@ public partial class MainWindow : Window
         if (launchAfterUpdate)
         {
             SetStatus("Conferindo pack...");
-            var readiness = await LauncherRuntime.CheckPackReadinessAsync(gameDir, activeManifest, LauncherRuntime.JsonOptions, settings.ResourcepackProfile);
+            var readiness = knownReadiness ?? await LauncherRuntime.CheckPackReadinessAsync(gameDir, activeManifest, LauncherRuntime.JsonOptions, settings.ResourcepackProfile);
             if (readiness.IsReady)
             {
                 var installedVersionId = FabricProfileInstaller.FindInstalledVersionId(

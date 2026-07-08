@@ -18,7 +18,7 @@ namespace CobblemonLegacy;
 internal static class LauncherRuntime
 {
     public const string LauncherName = "Cobblemon Legacy";
-    public const string LauncherVersion = "1.3.9";
+    public const string LauncherVersion = "1.4.0";
     public const string ServerIp = "enx-cirion-16.enx.host:10068";
     public const string ServerHost = "Enxada Host";
     private const int StaleGameProcessSeconds = 30;
@@ -379,6 +379,12 @@ internal static class LauncherRuntime
     {
         var memory = TryGetPhysicalMemoryMb();
         return memory is null ? 4_096 : GetRecommendedMaximumRamMb(memory.TotalMb);
+    }
+
+    public static SystemMemorySnapshot? GetSystemMemorySnapshot()
+    {
+        var memory = TryGetPhysicalMemoryMb();
+        return memory is null ? null : new SystemMemorySnapshot(memory.TotalMb, memory.AvailableMb);
     }
 
     public static PerformanceTier GetPerformanceTier()
@@ -1166,6 +1172,8 @@ internal enum PerformanceTier
 }
 
 internal readonly record struct GameWindowSize(int Width, int Height);
+
+internal readonly record struct SystemMemorySnapshot(int TotalMb, int AvailableMb);
 
 internal static class AuthModes
 {
