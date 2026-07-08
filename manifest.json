@@ -1,6 +1,6 @@
 ﻿{
     "name":  "Cobblemon Legacy",
-    "version":  "1.0.9",
+    "version":  "1.0.10",
     "minecraftVersion":  "1.21.1",
     "fabricLoaderVersion":  "0.19.3",
     "files":  [
@@ -219,13 +219,6 @@
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/cobblesafari-fabric-1.21.1-0.2.3.1.jar",
                       "sha256":  "8c0e1c649e7b038ac575d99fb034328893b639d5b427f0d401f874373a66d9f8",
                       "size":  15077070,
-                      "required":  true
-                  },
-                  {
-                      "path":  "mods/cobbletcg-1.5.0.jar",
-                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/cobbletcg-1.5.0.jar",
-                      "sha256":  "7318e3b529ded600ad83a3a20d281bc69b8fc13e75d19da124c63be9ff1936d5",
-                      "size":  48021162,
                       "required":  true
                   },
                   {
@@ -758,41 +751,6 @@
                       "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/CobbleMotion_v1.4.1.zip",
                       "sha256":  "3dddc2257ea64e16daaee9102196eb93cc6e3df44ce58cca9ef5ddff5a372ecd",
                       "size":  1555782,
-                      "required":  true
-                  },
-                  {
-                      "path":  "resourcepacks/CobbleTCG_ResourcePack1.zip",
-                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/CobbleTCG_ResourcePack1.zip",
-                      "sha256":  "ae9692bbcd3a9ef91480fec2ef64e3d016524aa1029cbae2370e028ba8db700f",
-                      "size":  277402401,
-                      "required":  true
-                  },
-                  {
-                      "path":  "resourcepacks/CobbleTCG_ResourcePack2.zip",
-                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/CobbleTCG_ResourcePack2.zip",
-                      "sha256":  "983b9b2fae3b7b15601c5461b1b3f84f6ff98feec92193a2356215eade5039e3",
-                      "size":  328497795,
-                      "required":  true
-                  },
-                  {
-                      "path":  "resourcepacks/CobbleTCG_ResourcePack3.zip",
-                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/CobbleTCG_ResourcePack3.zip",
-                      "sha256":  "37e44733738261e59e82329bab825bb0167be78ad59b9eea6bf020aa6fadedbf",
-                      "size":  336990099,
-                      "required":  true
-                  },
-                  {
-                      "path":  "resourcepacks/CobbleTCG_ResourcePack4.zip",
-                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/CobbleTCG_ResourcePack4.zip",
-                      "sha256":  "fb11e9566692f35b61500d9a79911cd1ce3fec9434fc60e37a071484d51c02f4",
-                      "size":  469949754,
-                      "required":  true
-                  },
-                  {
-                      "path":  "resourcepacks/CobbleTCG_ResourcePack5.zip",
-                      "url":  "https://github.com/gotardelo/cobblemonlegacy-downloads/releases/download/v1.0.0/CobbleTCG_ResourcePack5.zip",
-                      "sha256":  "999ac0f1d14f99b0c4ad0e80a3cfdf269f222e9282ea034f4732cdafbdabc095",
-                      "size":  379888511,
                       "required":  true
                   },
                   {
